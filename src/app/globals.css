@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 240, 245, 255;
+  --background-rgb: 4, 7, 16;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  font-family: var(--font-rajdhani), sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Custom sci-fi styling */
+.glow-text-blue {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(0, 112, 243, 0.6);
+}
+
+.glow-text-red {
+  text-shadow: 0 0 10px rgba(255, 0, 51, 0.8), 0 0 20px rgba(220, 38, 38, 0.6);
+}
+
+.glow-box-blue {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.2);
+}
+
+.glow-box-red {
+  box-shadow: 0 0 15px rgba(255, 0, 51, 0.4), inset 0 0 15px rgba(255, 0, 51, 0.2);
+}
+
+/* Scanline and CRT overlay effect for retro-futuristic arcade atmosphere */
+.scanlines {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 4px, 6px 100%;
+  pointer-events: none;
+}
+
+/* Disable right-click menu & touch callouts inside game container */
+#game-container, canvas {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
