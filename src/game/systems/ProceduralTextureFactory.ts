@@ -3,6 +3,7 @@ import { buildGOne } from '../art/gone';
 import { buildRaOne } from '../art/raone';
 import { buildFx } from '../art/fx';
 import { buildArena } from '../art/arena';
+import { buildRelics } from '../art/relics';
 
 /**
  * Bakes every texture and animation the game needs.
@@ -19,6 +20,7 @@ export class ProceduralTextureFactory {
     buildGOne(scene);
     buildRaOne(scene);
     buildArena(scene);
+    buildRelics(scene);
   }
 
   /**

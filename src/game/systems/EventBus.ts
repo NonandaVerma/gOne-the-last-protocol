@@ -94,6 +94,11 @@ export const GAME_EVENTS = {
   // Settings
   SETTINGS_CHANGED: 'settings-changed',
 
+  // Relics & Power-ups
+  RELIC_COLLECTED: 'relic-collected',
+  ACTIVE_RELICS_CHANGED: 'active-relics-changed',
+  LEVEL_COMPLETED: 'level-completed',
+
   // Input triggers from React UI (e.g. mobile virtual buttons or HUD clicks)
   TRIGGER_MOVE_LEFT: 'trigger-move-left',
   TRIGGER_MOVE_RIGHT: 'trigger-move-right',

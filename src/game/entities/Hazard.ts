@@ -25,8 +25,6 @@ export class HazardManager {
     this.juice = juice;
     this.groundTop = groundTop;
     this.group = scene.physics.add.group({ allowGravity: false, immovable: true });
-
-    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.clearAll());
   }
 
   public getGroup() {
@@ -165,8 +163,23 @@ export class HazardManager {
 
   public clearAll() {
     this.alive = false;
-    this.timers.forEach((t) => t.remove(false));
-    this.timers = [];
-    this.group.clear(true, true);
+    if (this && this.timers && Array.isArray(this.timers)) {
+      this.timers.forEach((t) => {
+        if (t && typeof t.remove === 'function') {
+          try {
+            t.remove(false);
+          } catch (_) {}
+        }
+      });
+      this.timers = [];
+    }
+    if (this && this.group) {
+      try {
+        const children = (this.group as any).children;
+        if (children && typeof children.forEach === 'function') {
+          this.group.clear(true, true);
+        }
+      } catch (_) {}
+    }
   }
 }

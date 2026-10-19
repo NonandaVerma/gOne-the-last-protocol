@@ -3,12 +3,12 @@ import { StorySlide } from '../types/game';
 export const OPENING_STORY: StorySlide[] = [
   {
     id: 'intro-1',
-    title: 'THE TRANSMISSION',
-    subtitle: 'ORBITAL SECTOR 7 // RUINED ATMOSPHERE',
+    title: 'THE CELESTIAL TRANSMISSION',
+    subtitle: 'OLYMPIAN CONCLAVE // SECTOR ZERO',
     text: [
-      'EMERGENCY TRANSFER INITIATED.',
-      'DESTINATION: EARTH.',
-      'GUARDIAN PROTOCOL: ACTIVE.',
+      'The sacred pillars have collapsed into volcanic ruin.',
+      'A cataclysm of blood and iron engulfs the mortal realm.',
+      'The Divine Guardian Protocol is summoned.',
     ],
     speaker: 'SYSTEM',
     visualCues: {
@@ -19,12 +19,12 @@ export const OPENING_STORY: StorySlide[] = [
   },
   {
     id: 'intro-2',
-    title: 'THE ARRIVAL',
-    subtitle: 'IMPACT ZONE // GROUND ZERO',
+    title: 'THE DIVINE DESCENT',
+    subtitle: 'THE IMPACT CRATER // ASHEN REACHES',
     text: [
-      'WHEN THE WORLD LOST ITS LIGHT,',
-      'ONE SIGNAL REFUSED TO DIE.',
-      'G-ONE HAS ENTERED THE COMBAT ARENA.',
+      'Adorned in celestial silver and celestial blue fire,',
+      'G-One descends into the scorched crater of humanity.',
+      'A solitary godlike shield against impending oblivion.',
     ],
     speaker: 'NARRATOR',
     visualCues: {
@@ -35,12 +35,12 @@ export const OPENING_STORY: StorySlide[] = [
   },
   {
     id: 'intro-3',
-    title: 'THE ANOMALY',
-    subtitle: 'THE THRONE OF DESTRUCTION',
+    title: 'THE VIKING DESTROYER',
+    subtitle: 'THE THRONE OF RAGNAROK',
     text: [
-      'THREAT DETECTED: RA-ONE.',
-      '"You were designed to protect. I was designed to end."',
-      'GUARDIAN PROTOCOL ENGAGED.',
+      'From the molten volcanic throne rises Ra-One.',
+      'Armed with dark Nordic runes and apocalyptic flames:',
+      '"You were fashioned to protect the weak. I was forged to incinerate them."',
     ],
     speaker: 'RA-ONE',
     visualCues: {
@@ -53,12 +53,12 @@ export const OPENING_STORY: StorySlide[] = [
 
 export const LEVEL_2_TRANSITION: StorySlide = {
   id: 'transition-l2',
-  title: 'METROPOLIS INFECTION',
-  subtitle: 'THE NETWORK EXPANDS',
+  title: 'THE RUINED CITADEL',
+  subtitle: 'CHAPTER II — FALLEN METROPOLIS',
   text: [
-    'THE PHYSICAL SHELL WAS DESTROYED.',
-    'THE CORRUPT PROTOCOL SURVIVED.',
-    'THE ENTIRE CITY BECAME HIS WEAPON.',
+    'The volcanic vanguard has crumbled, yet the destroyer endures.',
+    'Ra-One has ascended to the spires of the shattered metropolis.',
+    'Beware the falling debris and the fury of his aerial barrage.',
   ],
   speaker: 'NARRATOR',
   visualCues: {
@@ -69,12 +69,12 @@ export const LEVEL_2_TRANSITION: StorySlide = {
 
 export const LEVEL_3_TRANSITION: StorySlide = {
   id: 'transition-l3',
-  title: 'REALITY FRACTURE',
-  subtitle: 'THE ZERO-DAY ABYSS',
+  title: 'THE FINAL DIVINE RECKONING',
+  subtitle: 'CHAPTER III — THE ZERO-DAY ABYSS  //  ONE HIT DECIDES',
   text: [
-    'THE ENERGY NETWORK HAS SURPASSED CRITICAL THRESHOLD.',
-    'THE BOUNDARY BETWEEN CODE AND PHYSICAL MATTER IS SHATTERED.',
-    'ONE FINAL STRIKE WILL DETERMINE THE EXISTENCE OF THIS WORLD.',
+    'The boundary between Olympus and the abyss has shattered.',
+    'All mortal armor is stripped bare. Only pure divine spirit remains.',
+    'A single decisive blow will dictate whether light survives or darkness rules.',
   ],
   speaker: 'SYSTEM',
   visualCues: {
@@ -84,15 +84,15 @@ export const LEVEL_3_TRANSITION: StorySlide = {
 };
 
 export const DEFEAT_STORY = {
-  header: 'GUARDIAN SIGNAL LOST',
-  subtext: 'PROTECTION PROTOCOL TERMINATED // THE LAST LIGHT HAS FALLEN',
+  header: 'DIVINE SHIELD SHATTERED',
+  subtext: 'THE OLYMPIAN GUARDIAN HAS FALLEN // RAGNAROK HAS COMMENCED',
   mainTitle: 'EVIL PREVAILS',
-  lore: 'RA-ONE HAS CLAIMED THE FINAL PROTOCOL. THE WORLD WILL REMEMBER THE NIGHT IT WENT DARK.',
+  lore: 'RA-ONE ASCENDS THE BLACKENED PYRE. THE DIVINE LIGHT IS EXTINGUISHED, AND THE NORDIC FIRE RULES OVER THE ASHES.',
 };
 
 export const VICTORY_STORY = {
-  header: 'RA-ONE CORE: OFFLINE',
-  subtext: 'GUARDIAN PROTOCOL: RESTORED // THE FINAL SIGNAL HAS BEEN ANSWERED',
+  header: 'THE DESTROYER VANQUISHED',
+  subtext: 'GUARDIAN PROTOCOL FULFILLED // THE CELESTIAL DAWN IS RESTORED',
   mainTitle: 'LIGHT SURVIVES',
-  lore: 'THE WORLD WAS NOT SAVED BY POWER ALONE. IT WAS SAVED BY THE ONE WHO REFUSED TO ABANDON IT.',
+  lore: 'WITH ZEUS’S WRATH AND ATHENA’S AEGIS, G-ONE SHATTERS THE CORRUPT ESSENCE OF RA-ONE. THE REALM IS RENEWED IN RADIANT GLORY.',
 };

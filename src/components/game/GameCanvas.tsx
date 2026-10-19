@@ -16,6 +16,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameReady }) => {
 
     let isMounted = true;
 
+    // Prevent unwanted IME composition (e.g. Hindi/foreign input systems) while gaming
+    const handleCompositionStart = (e: CompositionEvent) => {
+      if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('compositionstart', handleCompositionStart);
+
     // Prevent duplicate Phaser instances
     if (!gameRef.current) {
       Promise.all([
@@ -29,6 +38,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameReady }) => {
         const game = new GameClass(config);
         gameRef.current = game;
 
+        if (containerRef.current) {
+          containerRef.current.focus();
+        }
+
         if (onGameReady) {
           onGameReady();
         }
@@ -39,6 +52,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameReady }) => {
 
     return () => {
       isMounted = false;
+      window.removeEventListener('compositionstart', handleCompositionStart);
       if (gameRef.current) {
         gameRef.current.destroy(true);
         gameRef.current = null;
@@ -46,12 +60,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameReady }) => {
     };
   }, [onGameReady]);
 
+  const handleContainerClick = () => {
+    // Blur any active DOM input/button so gameplay keys go directly to canvas
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
+    containerRef.current?.focus();
+  };
+
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none">
+    <div
+      onClick={handleContainerClick}
+      className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none"
+    >
       <div
         id="game-container"
         ref={containerRef}
-        className="w-full h-full max-w-[1280px] max-h-[720px] aspect-video shadow-2xl relative"
+        tabIndex={0}
+        style={{ outline: 'none' }}
+        className="w-full h-full max-w-[1280px] max-h-[720px] aspect-video shadow-2xl relative outline-none focus:outline-none"
       />
     </div>
   );

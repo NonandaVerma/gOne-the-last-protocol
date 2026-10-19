@@ -136,7 +136,10 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
   private applyGlow() {
     if (!(this.scene.game.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) return;
     try {
-      this.postFX.addGlow(VILLAIN.energy, 1.3, 0, false, 0.1, 10);
+      if (typeof (this as any).enableFilters === 'function') {
+        (this as any).enableFilters();
+        (this as any).filters?.internal?.addGlow(VILLAIN.energy, 4, 0, 1);
+      }
     } catch {
       /* non fatal */
     }
@@ -314,7 +317,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
         onUpdate: (tw) => {
           if (!this.active) return;
           const v = tw.getValue() ?? 0;
-          if (Math.sin(v * Math.PI * 10) > 0) this.setTintFill(VILLAIN.energy);
+          if (Math.sin(v * Math.PI * 10) > 0) this.setTint(VILLAIN.energy).setTintMode(Phaser.TintModes.FILL);
           else this.clearTint();
         },
         onComplete: () => this.clearTint(),
@@ -697,7 +700,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.isInvulnerable = true;
-    this.setTintFill(0xffffff);
+    this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     this.scene.time.delayedCall(70, () => this.active && this.clearTint());
     this.scene.time.delayedCall(CFG.invulnerabilityDuration, () => {
       this.isInvulnerable = false;
@@ -775,7 +778,11 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
       this.plume.setFlipX(this.flipX);
     }
 
-    if (this.bossState === 'defeated' || !this.target || !this.target.active) return;
+    if (this.bossState === 'defeated' || !this.target || !this.target.active || (this.target as any).isDead) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      if (body) body.setVelocity(0, 0);
+      return;
+    }
 
     // Idle repositioning: close the gap, or back off if crowded.
     if (!this.busy && this.bossState === 'idle' && !this.flying) {

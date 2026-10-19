@@ -123,3 +123,30 @@ export interface StorySlide {
     lightning?: 'blue' | 'red';
   };
 }
+
+export type RelicType =
+  | 'aegis_olympus'
+  | 'thunderheart'
+  | 'phoenix_core'
+  | 'hermes_step'
+  | 'overdrive_shard'
+  | 'rune_of_ruin';
+
+export interface RelicConfig {
+  id: RelicType;
+  name: string;
+  tagline: string;
+  description: string;
+  icon: string;
+  color: number;
+  duration?: number;
+}
+
+export interface ActiveRelicState {
+  id: RelicType;
+  name: string;
+  remainingMs: number;
+  maxMs: number;
+  charges?: number;
+}
+

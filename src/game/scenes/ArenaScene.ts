@@ -12,6 +12,7 @@ import { Backdrop } from '../systems/Backdrop';
 import { EventBus, GAME_EVENTS } from '../systems/EventBus';
 import { HERO, VILLAIN } from '../art/palette';
 import { ArenaGeometry } from '../types/game';
+import { PowerUpManager, PowerUpPickup } from '../entities/PowerUp';
 
 /**
  * The playable arena. Owns the fight: geometry, camera, colliders, input and
@@ -30,6 +31,7 @@ export class ArenaScene extends Phaser.Scene {
   private playerProjectiles?: Phaser.Physics.Arcade.Group;
   private bossProjectiles?: Phaser.Physics.Arcade.Group;
   private hazards?: HazardManager;
+  private powerUps?: PowerUpManager;
   private crosshair?: Phaser.GameObjects.Image;
   private lockOn?: Phaser.GameObjects.Image;
   private backdrop?: Backdrop;
@@ -103,6 +105,11 @@ export class ArenaScene extends Phaser.Scene {
       this.juice,
       config.playerHealth
     );
+
+    this.powerUps = new PowerUpManager(this, this.juice, this.currentLevel);
+    this.player.setPowerUpManager(this.powerUps);
+    this.powerUps.setPlayer(this.player);
+    this.powerUps.startArenaSpawning(arena.platforms);
 
     this.boss = new RaOne({
       scene: this,
@@ -205,12 +212,14 @@ export class ArenaScene extends Phaser.Scene {
       this.physics.add.overlap(this.playerProjectiles, this.boss, (bossObj, projObj) => {
         const proj = projObj as Projectile;
         const boss = bossObj as RaOne;
-        if (!proj.active || !boss.active || proj.owner !== 'player') return;
+        if (!proj.active || !boss.active || proj.owner !== 'player' || this.isLevelEnding) return;
         if (!proj.registerHit(boss)) return;
 
-        const hit = boss.takeDamage(proj.damage);
+        const rawDmg = proj.damage;
+        const finalDmg = this.powerUps ? this.powerUps.modifyOutgoingDamage(rawDmg) : rawDmg;
+        const hit = boss.takeDamage(finalDmg);
         if (hit && this.player) {
-          this.player.addOverdriveCharge(proj.damage > 1 ? 16 : 6);
+          this.player.addOverdriveCharge(finalDmg > 1 ? 16 : 6);
         }
         if (!proj.pierce) proj.kill(true);
       });
@@ -232,7 +241,7 @@ export class ArenaScene extends Phaser.Scene {
       this.physics.add.overlap(this.bossProjectiles, this.player, (playerObj, projObj) => {
         const proj = projObj as Projectile;
         const p = playerObj as GOne;
-        if (!proj.active || !p.active || proj.owner !== 'boss') return;
+        if (!proj.active || !p.active || proj.owner !== 'boss' || this.isLevelEnding || p.isDead) return;
         if (!proj.registerHit(p)) return;
 
         p.takeDamage(proj.damage, proj.x, proj.unblockable);
@@ -244,7 +253,16 @@ export class ArenaScene extends Phaser.Scene {
       this.physics.add.overlap(this.hazards.getGroup(), this.player, (playerObj, hazardObj) => {
         const p = playerObj as GOne;
         const hz = hazardObj as Phaser.Physics.Arcade.Sprite;
-        if (p.active && hz.active) p.takeDamage(1);
+        if (p.active && hz.active && !this.isLevelEnding && !p.isDead) p.takeDamage(1);
+      });
+    }
+
+    if (this.powerUps && this.player) {
+      this.physics.add.overlap(this.player, this.powerUps.getGroup(), (_playerObj, pickupObj) => {
+        const pickup = pickupObj as PowerUpPickup;
+        if (pickup.active && !this.isLevelEnding && !this.player?.isDead) {
+          this.powerUps?.collect(pickup);
+        }
       });
     }
   }
@@ -255,6 +273,13 @@ export class ArenaScene extends Phaser.Scene {
 
   private setupInput() {
     if (this.input.keyboard) {
+      this.input.keyboard.addCapture([
+        Phaser.Input.Keyboard.KeyCodes.SPACE,
+        Phaser.Input.Keyboard.KeyCodes.UP,
+        Phaser.Input.Keyboard.KeyCodes.DOWN,
+        Phaser.Input.Keyboard.KeyCodes.LEFT,
+        Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      ]);
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
       this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
@@ -355,9 +380,10 @@ export class ArenaScene extends Phaser.Scene {
       EventBus.off(GAME_EVENTS.RESTART_STORY, onRestartStory);
       EventBus.off(GAME_EVENTS.QUIT_TO_MENU, onQuitToMenu);
       if (this.contextMenuHandler) this.game.canvas?.removeEventListener('contextmenu', this.contextMenuHandler);
-      this.hazards?.clearAll();
-      this.backdrop?.destroy();
-      this.juice?.clearFreeze();
+      try { this.hazards?.clearAll(); } catch (_) {}
+      try { this.powerUps?.clearAll(); } catch (_) {}
+      try { this.backdrop?.destroy(); } catch (_) {}
+      try { this.juice?.clearFreeze(); } catch (_) {}
     });
   }
 
@@ -385,12 +411,24 @@ export class ArenaScene extends Phaser.Scene {
   // ===========================================================================
 
   private handleBossDefeated() {
+    try {
+      if (this.bossProjectiles && (this.bossProjectiles as any).children && typeof (this.bossProjectiles as any).children.forEach === 'function') {
+        this.bossProjectiles.clear(true, true);
+      }
+    } catch (_) {}
+    try { this.hazards?.clearAll(); } catch (_) {}
+    try { this.juice?.clearFreeze(); } catch (_) {}
+
     if (this.currentLevel === 1) {
       this.showLevelTransition(2, LEVEL_2_TRANSITION.text);
     } else if (this.currentLevel === 2) {
       this.showLevelTransition(3, LEVEL_3_TRANSITION.text);
     } else {
-      this.time.delayedCall(1400, () => this.scene.start('VictoryScene'));
+      EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'VICTORY');
+      this.time.delayedCall(1200, () => {
+        try { this.powerUps?.clearAll(); } catch (_) {}
+        this.scene.start('VictoryScene');
+      });
     }
   }
 
@@ -398,16 +436,16 @@ export class ArenaScene extends Phaser.Scene {
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'LEVEL_TRANSITION');
 
     const overlay = this.add.graphics().setScrollFactor(0).setDepth(80).setAlpha(0);
-    overlay.fillStyle(0x000000, 0.88);
+    overlay.fillStyle(0x000000, 0.92);
     overlay.fillRect(0, 0, VIEW_W, VIEW_H);
 
     const txt = this.add
       .text(VIEW_W / 2, VIEW_H / 2 - 40, storyLines.join('\n\n'), {
-        fontFamily: 'Orbitron, sans-serif',
-        fontSize: '20px',
-        color: '#3ae9ff',
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '22px',
+        color: '#38bdf8',
         align: 'center',
-        lineSpacing: 12,
+        lineSpacing: 14,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -415,28 +453,95 @@ export class ArenaScene extends Phaser.Scene {
       .setAlpha(0);
 
     const prompt = this.add
-      .text(VIEW_W / 2, VIEW_H / 2 + 110, '[ SPACE / CLICK TO ENTER NEXT ARENA ]', {
-        fontFamily: 'Rajdhani, sans-serif',
-        fontSize: '18px',
-        color: '#ffffff',
+      .text(VIEW_W / 2, VIEW_H / 2 + 130, '[ CLICK / PRESS SPACE TO ENTER NEXT ARENA ]', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '20px',
+        color: '#f59e0b',
+        fontStyle: 'bold',
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
-      .setDepth(81)
+      .setDepth(82)
       .setAlpha(0);
 
-    this.tweens.add({ targets: [overlay, txt, prompt], alpha: 1, duration: 700 });
+    this.tweens.add({ targets: [overlay, txt, prompt], alpha: 1, duration: 500 });
+    this.tweens.add({
+      targets: prompt,
+      scaleX: 1.05,
+      scaleY: 1.05,
+      yoyo: true,
+      repeat: -1,
+      duration: 650,
+      ease: 'Sine.easeInOut',
+    });
 
-    const proceed = () => this.scene.restart({ level: nextLevel });
-    this.time.delayedCall(900, () => {
+    let hasProceeded = false;
+    const cleanupFns: Array<() => void> = [];
+
+    const proceed = () => {
+      if (hasProceeded) return;
+      hasProceeded = true;
+
+      cleanupFns.forEach((fn) => {
+        try { fn(); } catch (_) {}
+      });
+      cleanupFns.length = 0;
+
+      try {
+        this.powerUps?.clearAll();
+      } catch (_) {}
+
+      this.scene.restart({ level: nextLevel });
+    };
+
+    // Make interactive with hand cursor
+    prompt.setInteractive({ useHandCursor: true });
+    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, VIEW_W, VIEW_H), Phaser.Geom.Rectangle.Contains);
+
+    // Brief 250ms debounce before accepting input so that combat clicks don't skip
+    this.time.delayedCall(250, () => {
+      prompt.on('pointerdown', proceed);
+      overlay.on('pointerdown', proceed);
       this.input.once('pointerdown', proceed);
-      this.input.keyboard?.once('keydown-SPACE', proceed);
-      this.input.keyboard?.once('keydown-ENTER', proceed);
+
+      cleanupFns.push(() => {
+        try {
+          prompt.off('pointerdown', proceed);
+          overlay.off('pointerdown', proceed);
+          this.input.off('pointerdown', proceed);
+        } catch (_) {}
+      });
+
+      const onWindowKey = (e: KeyboardEvent) => {
+        if (e.code === 'Space' || e.code === 'Enter' || e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          proceed();
+        }
+      };
+      window.addEventListener('keydown', onWindowKey, { capture: true });
+      cleanupFns.push(() => window.removeEventListener('keydown', onWindowKey, { capture: true }));
+
+      const onWindowClick = () => {
+        proceed();
+      };
+      window.addEventListener('pointerdown', onWindowClick, { capture: true });
+      cleanupFns.push(() => window.removeEventListener('pointerdown', onWindowClick, { capture: true }));
     });
   }
 
   private handlePlayerDefeated() {
-    this.time.delayedCall(1400, () => this.scene.start('DefeatScene', { level: this.currentLevel }));
+    try {
+      if (this.bossProjectiles && (this.bossProjectiles as any).children && typeof (this.bossProjectiles as any).children.forEach === 'function') {
+        this.bossProjectiles.clear(true, true);
+      }
+    } catch (_) {}
+    try { this.hazards?.clearAll(); } catch (_) {}
+    try { this.juice?.clearFreeze(); } catch (_) {}
+    EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'DEFEAT');
+    this.time.delayedCall(900, () => {
+      try { this.powerUps?.clearAll(); } catch (_) {}
+      this.scene.start('DefeatScene', { level: this.currentLevel });
+    });
   }
 
   public togglePause() {
@@ -462,6 +567,7 @@ export class ArenaScene extends Phaser.Scene {
 
   update(time: number, delta: number) {
     this.juice?.update(time);
+    this.powerUps?.update(time, delta);
 
     if (this.backdrop) {
       this.backdrop.update(this.cameras.main.scrollX, this.cameras.main.scrollY, delta);

@@ -6,6 +6,7 @@ import { Projectile, spawnProjectile } from './Projectile';
 import { AudioManager } from '../systems/AudioManager';
 import { EventBus, GAME_EVENTS } from '../systems/EventBus';
 import { Juice } from '../systems/Juice';
+import type { PowerUpManager } from './PowerUp';
 
 const CFG = G_ONE_CONFIG;
 const A = CFG.abilities;
@@ -58,7 +59,12 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
 
   private pool: Phaser.Physics.Arcade.Group;
   private juice: Juice;
+  private powerUps?: PowerUpManager;
   private detach: Array<() => void> = [];
+
+  public setPowerUpManager(m: PowerUpManager) {
+    this.powerUps = m;
+  }
 
   constructor(
     scene: Phaser.Scene,
@@ -124,8 +130,12 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
     const renderer = this.scene.game.renderer;
     if (!(renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) return;
     try {
-      this.postFX.addGlow(HERO.energy, 1.1, 0, false, 0.1, 10);
-      this.cannon.postFX.addGlow(HERO.energy, 1.2, 0, false, 0.1, 8);
+      if (typeof (this as any).enableFilters === 'function') {
+        (this as any).enableFilters();
+        (this as any).filters?.internal?.addGlow(HERO.energy, 4, 0, 1);
+        (this.cannon as any).enableFilters();
+        (this.cannon as any).filters?.internal?.addGlow(HERO.energy, 4, 0, 1);
+      }
     } catch {
       /* Glow is a nicety; never let it break the game. */
     }
@@ -222,14 +232,28 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
     const angle = this.aimAngle;
     const origin = this.muzzlePoint;
 
+    let dmg = A.pulseShot.damage * (this.isOverdriveActive ? A.overdrive.damageMultiplier : 1);
+    let texture = 'proj_pulse';
+    let anim = 'proj-pulse';
+
+    if (this.powerUps?.isThunderheartActive()) {
+      dmg *= 2;
+      texture = 'relic_thunder_bolt';
+      anim = '';
+      this.juice.impact(origin.x, origin.y, 'player', { scale: 0.8, sparks: 8 });
+    }
+    if (this.powerUps?.isRuneOfRuinActive()) {
+      dmg *= 2;
+    }
+
     spawnProjectile(this.pool, {
       x: origin.x,
       y: origin.y,
-      texture: 'proj_pulse',
-      anim: 'proj-pulse',
-      speed: A.pulseShot.speed,
+      texture,
+      anim,
+      speed: A.pulseShot.speed * (this.powerUps?.isThunderheartActive() ? 1.25 : 1),
       angle,
-      damage: A.pulseShot.damage * (this.isOverdriveActive ? A.overdrive.damageMultiplier : 1),
+      damage: dmg,
       owner: 'player',
       lifespan: 2200,
       scale: 0.62,
@@ -322,7 +346,8 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
   public performDash(): boolean {
     if (this.isDead || this.isDashing) return false;
     const now = this.scene.time.now;
-    if (now - this.lastDashAt < A.dash.cooldown) return false;
+    const cdMult = this.powerUps ? this.powerUps.getDashCooldownMultiplier() : 1;
+    if (now - this.lastDashAt < A.dash.cooldown * cdMult) return false;
 
     this.lastDashAt = now;
     this.isDashing = true;
@@ -414,6 +439,12 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
     if (this.isDead) return false;
     if (this.isInvulnerable || this.isDashing) return false;
 
+    if (this.powerUps) {
+      const incoming = this.powerUps.modifyIncomingDamage(amount);
+      if (incoming.absorbed) return false;
+      amount = incoming.damage;
+    }
+
     if (this.isShielded && !unblockable) {
       this.onDeflect(fromX);
       return false;
@@ -488,7 +519,7 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
 
   private startInvulnerability() {
     this.isInvulnerable = true;
-    this.setTintFill(0xffffff);
+    this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     this.scene.time.delayedCall(70, () => {
       if (this.active) this.clearTint();
     });
@@ -519,7 +550,11 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
     this.setAlpha(1);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    if (body) body.setVelocity(0, 0);
+    if (body) {
+      body.setVelocity(0, 0);
+      body.setAcceleration(0, 0);
+      body.enable = false;
+    }
 
     AudioManager.getInstance().playExplosion();
     this.juice.hitStop(140);
@@ -545,7 +580,7 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
       this.scene.time.delayedCall(1800, () => shards.destroy());
     }
 
-    this.scene.time.delayedCall(900, () => EventBus.emit(GAME_EVENTS.PLAYER_DIED));
+    EventBus.emit(GAME_EVENTS.PLAYER_DIED);
   }
 
   // =========================================================================
@@ -642,15 +677,21 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
+    const speedMult = this.powerUps ? this.powerUps.getSpeedMultiplier() : 1;
+    body.setMaxVelocity(CFG.maxSpeed * speedMult, 2200);
+
     // --- Facing --------------------------------------------------------------
     this.setFlipX(this.facing < 0);
 
     // --- Horizontal movement -------------------------------------------------
     if (!this.isDashing) {
-      const accel = grounded ? CFG.groundAccel : CFG.airAccel;
+      const accel = (grounded ? CFG.groundAccel : CFG.airAccel) * speedMult;
       if (this.moveInput !== 0) {
         body.setAccelerationX(this.moveInput * accel);
         body.setDragX(0);
+        if (this.powerUps?.isHermesActive() && time >= this.nextRunDustAt) {
+          this.juice.afterImage(this, 0x06b6d4, 180, 0.4);
+        }
       } else {
         body.setAccelerationX(0);
         body.setDragX(grounded ? CFG.groundDrag : CFG.airDrag);

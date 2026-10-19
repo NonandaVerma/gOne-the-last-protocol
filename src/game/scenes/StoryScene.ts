@@ -42,6 +42,13 @@ export class StoryScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ENTER', () => this.skipIntro());
     this.input.keyboard?.on('keydown-ESC', () => this.skipIntro());
 
+    const onSkip = () => this.skipIntro();
+    EventBus.once(GAME_EVENTS.SKIP_INTRO, onSkip);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      EventBus.off(GAME_EVENTS.SKIP_INTRO, onSkip);
+    });
+
     this.playStep(0);
   }
 
@@ -67,7 +74,6 @@ export class StoryScene extends Phaser.Scene {
     }
 
     EventBus.emit(GAME_EVENTS.STORY_STEP, { index, total: OPENING_STORY.length, slide });
-    this.renderCaption(slide.title, slide.subtitle, slide.text);
 
     if (index === 0) this.sceneSignal(width, height);
     else if (index === 1) this.sceneArrival(width, height);

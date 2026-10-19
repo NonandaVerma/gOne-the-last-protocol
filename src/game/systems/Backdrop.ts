@@ -31,9 +31,12 @@ export class Backdrop {
 
     const reduced = SaveManager.getSettings().reducedMotion;
 
-    // --- Sky (locked to the camera) -----------------------------------------
+    // --- Sky & High-Res Background Art (locked to camera) -------------------
+    const bgKey = `bg_level${level}`;
+    const hasArt = scene.textures.exists(bgKey);
+    const skyKey = hasArt ? bgKey : `sky_${level}`;
     const sky = scene.add
-      .image(0, 0, `sky_${level}`)
+      .image(0, 0, skyKey)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(-100);
@@ -55,29 +58,29 @@ export class Backdrop {
         .setOrigin(0, 0)
         .setScrollFactor(0)
         .setDepth(depth)
-        .setAlpha(alpha);
+        .setAlpha(hasArt ? alpha * 0.65 : alpha);
       this.layers.push({ sprite: t, factorX, driftX: reduced ? 0 : driftX });
       this.owned.push(t);
     };
 
     if (level === 1) {
-      push('cloud_band', 40, 260, 0.04, -92, 0.7, 5);
-      push('far_1', viewH - 500, 420, 0.14, -90);
-      push('mid_1', viewH - 480, 480, 0.3, -80);
-      push('near_1', viewH - 300, 320, 0.56, -70);
+      push('cloud_band', 40, 260, 0.04, -92, 0.6, 5);
+      push('far_1', viewH - 500, 420, 0.14, -90, 0.7);
+      push('mid_1', viewH - 480, 480, 0.3, -80, 0.8);
+      push('near_1', viewH - 300, 320, 0.56, -70, 0.9);
       this.ambientEmbers(viewW, viewH);
     } else if (level === 2) {
-      push('cloud_band', 20, 260, 0.03, -92, 0.5, 4);
-      push('far_2', viewH - 520, 460, 0.13, -90);
-      push('mid_2', viewH - 540, 520, 0.3, -80);
-      push('near_2', viewH - 330, 340, 0.58, -70);
+      push('cloud_band', 20, 260, 0.03, -92, 0.45, 4);
+      push('far_2', viewH - 520, 460, 0.13, -90, 0.65);
+      push('mid_2', viewH - 540, 520, 0.3, -80, 0.75);
+      push('near_2', viewH - 330, 340, 0.58, -70, 0.85);
       this.ambientRain(viewW, viewH);
       this.storm(viewW, viewH);
     } else {
-      push('grid_3', 0, viewH, 0.1, -95, 0.55, 8);
-      push('far_3', viewH - 560, 480, 0.16, -90);
-      push('mid_3', viewH - 560, 520, 0.34, -80);
-      push('near_3', viewH - 300, 300, 0.6, -70);
+      push('grid_3', 0, viewH, 0.1, -95, 0.4, 8);
+      push('far_3', viewH - 560, 480, 0.16, -90, 0.6);
+      push('mid_3', viewH - 560, 520, 0.34, -80, 0.75);
+      push('near_3', viewH - 300, 300, 0.6, -70, 0.85);
       this.ambientMotes(viewW, viewH);
       this.storm(viewW, viewH);
     }

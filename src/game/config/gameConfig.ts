@@ -46,7 +46,7 @@ export const createGameConfig = (parent: HTMLElement): Phaser.Types.Core.GameCon
       keyboard: true,
       mouse: true,
       touch: true,
-      windowEvents: false,
+      windowEvents: true,
     },
     disableContextMenu: true,
     scene: [BootScene, PreloadScene, MainMenuScene, StoryScene, ArenaScene, VictoryScene, DefeatScene],

@@ -421,4 +421,25 @@ export class AudioManager {
       osc.stop(now + idx * 0.25 + 1.2);
     });
   }
+
+  public playRelicCollect() {
+    this.init();
+    if (!this.ctx || !this.sfxGain || this.muted) return;
+    const now = this.ctx.currentTime;
+    const freqs = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    freqs.forEach((f, i) => {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, now + i * 0.05);
+      gain.gain.setValueAtTime(0.35, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.35);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.35);
+    });
+  }
 }
+

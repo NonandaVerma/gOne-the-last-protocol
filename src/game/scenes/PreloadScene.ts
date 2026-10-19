@@ -25,6 +25,12 @@ export class PreloadScene extends Phaser.Scene {
       color: '#00f0ff',
     }).setOrigin(0.5, 0.5);
 
+    // Preload high-resolution arena backgrounds
+    this.load.image('bg_level1', '/images/bg_level1.png');
+    this.load.image('bg_level2', '/images/bg_level2.png');
+    this.load.image('bg_level3', '/images/bg_level3.png');
+    this.load.image('bg_arrival', '/images/bg_arrival.png');
+
     this.load.on('progress', (value: number) => {
       progressBar.clear();
       progressBar.fillStyle(0x00f0ff, 1);
