@@ -117,20 +117,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
           ================================================================== */}
       <div className="absolute inset-0 overflow-hidden">
         <img
-          src="/images/bg_menu.png"
+          src="/images/landing-bg.png"
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover object-center animate-slow-push will-change-transform"
+          className="absolute inset-0 w-full h-full object-cover object-[center_top] will-change-transform"
         />
 
         {/* Edge scrims only — the centre (logo + both characters) stays clear. */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(7,10,15,0.55)_100%)]" />
-        <div className="absolute inset-y-0 left-0 w-[22%] bg-gradient-to-r from-obsidian/85 to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-[22%] bg-gradient-to-l from-obsidian/85 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(7,10,15,0.35)_100%)] pointer-events-none" />
+        <div className="absolute inset-y-0 left-0 w-[12%] bg-gradient-to-r from-obsidian/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-[12%] bg-gradient-to-l from-obsidian/40 to-transparent pointer-events-none" />
         {/* Lower scrim: hosts the controls and masks the art's baked-in
             lore block and "press any key" strip so text never doubles up. */}
-        <div className="absolute inset-x-0 bottom-0 h-[58%] bg-gradient-to-t from-obsidian via-obsidian/94 via-35% to-transparent" />
-        <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-obsidian/80 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t from-obsidian/85 via-obsidian/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-[10%] bg-gradient-to-b from-obsidian/45 to-transparent pointer-events-none" />
       </div>
 
       {/* Faction energy breathing over each character's core */}
@@ -179,7 +179,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
       {/* ==================================================================
           FOREGROUND INTERFACE
           ================================================================== */}
-      <div className="relative z-30 h-full flex flex-col justify-between p-5 md:p-8">
+      <div className="relative z-30 h-full flex flex-col justify-between p-3 sm:p-5 md:p-6 lg:p-7">
         {/* ---- Minimal top bar ---- */}
         <header className="flex items-start justify-between gap-4 animate-fade-in">
           <div className="flex items-center gap-2.5 panel px-3.5 py-2">
@@ -229,11 +229,22 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
         <h1 className="sr-only">G-One: The Last Protocol</h1>
 
         {/* ---- Action cluster, seated in the lower scrim ---- */}
-        <div className="flex flex-col items-center gap-5 pb-1">
-          <p className="hud-label text-muted text-center text-shadow-read animate-rise-in">
-            Reality is fracturing <span className="text-steel/50 mx-1.5">{'//'}</span>
-            Choose the force that will survive
-          </p>
+        <div className="flex flex-col items-center gap-3 sm:gap-4 pb-1">
+          {/* Telemetry banner matching the exact notched geometry & typography of ProtocolButton */}
+          <div className="clip-notch relative inline-flex items-center gap-2.5 px-5 py-2 border border-order-cyan/40 bg-graphite/90 backdrop-blur-md shadow-[0_0_20px_-6px_rgba(0,207,255,0.45)] animate-rise-in">
+            <span className="w-1.5 h-1.5 rotate-45 bg-order-cyan shadow-[0_0_6px_#00cfff] shrink-0" />
+            <span className="font-ui font-bold text-xs tracking-[0.24em] uppercase text-paper">
+              Reality is fracturing
+            </span>
+            <span className="text-order-cyan font-bold mx-1 opacity-80">{'//'}</span>
+            <span className="font-ui font-bold text-xs tracking-[0.24em] uppercase text-order-ice">
+              Choose the force that will survive
+            </span>
+            <span className="w-1.5 h-1.5 rotate-45 bg-entropy-crimson shadow-[0_0_6px_#ff243d] shrink-0" />
+          </div>
+
+
+
 
           <div className="w-full max-w-md animate-rise-in" style={{ animationDelay: '60ms' }}>
             <SeamDivider />
@@ -324,7 +335,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
               src="/images/video_intro.mp4"
               controls
               autoPlay
-              className="w-full h-full object-contain"
+              className="w-full h-full object-cover"
             />
           </div>
         </ModalShell>

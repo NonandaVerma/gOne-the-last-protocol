@@ -142,18 +142,18 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-obsidian flex items-center justify-center"
+      className="fixed inset-0 z-[60] bg-obsidian flex items-center justify-center overflow-hidden"
       onClick={phase === 'playing' ? finish : undefined}
       role="dialog"
       aria-label="Opening cinematic"
     >
-      {/* `contain` preserves the composition — both characters and the logo
-          stay fully in frame on every aspect ratio, at the cost of letterbox
-          bars that read as cinematic rather than as a layout bug. */}
+      {/* Full-viewport cover eliminates black sidebars and pillarboxing across all aspect ratios */}
+
+
       <video
         ref={videoRef}
         src="/images/video_intro.mp4"
-        className="absolute inset-0 w-full h-full object-contain bg-obsidian"
+        className="absolute inset-0 w-full h-full object-cover bg-obsidian"
         playsInline
         preload="auto"
         onEnded={finish}
@@ -164,14 +164,14 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
       {/* Gentle floor gradient purely for subtitle legibility. */}
       {phase === 'playing' && (
         <div
-          className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"
+          className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none z-10"
           aria-hidden="true"
         />
       )}
 
       {/* ---------------- Subtitles ---------------- */}
       {phase === 'playing' && (
-        <div className="absolute inset-x-0 bottom-[9%] px-6 flex justify-center pointer-events-none">
+        <div className="absolute inset-x-0 bottom-[9%] px-6 flex justify-center pointer-events-none z-20">
           <p
             key={cue?.text ?? 'none'}
             aria-live="polite"
@@ -191,7 +191,7 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
 
       {/* ---------------- Controls ---------------- */}
       {phase === 'playing' && (
-        <div className="absolute top-5 right-5 flex items-center gap-2">
+        <div className="absolute top-5 right-5 flex items-center gap-2 z-30">
           <button
             onClick={toggleSound}
             aria-label={muted ? 'Unmute cinematic' : 'Mute cinematic'}
