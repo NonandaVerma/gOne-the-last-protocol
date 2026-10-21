@@ -8,7 +8,10 @@ export type GameState =
   | 'VICTORY'
   | 'DEFEAT';
 
-export type LevelId = 1 | 2 | 3;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Total realms in the campaign. Single source of truth for progression. */
+export const REALM_COUNT = 6;
 
 export type BossState =
   | 'spawning'
@@ -62,6 +65,65 @@ export interface PlatformSpec {
   width: number;
 }
 
+/** Behaviour a platform exhibits beyond being solid ground. */
+export type PlatformBehaviour =
+  /** Ordinary static surface. */
+  | 'static'
+  /** Patrols between two points; carries the player. */
+  | 'moving'
+  /** Cracks, shudders, then drops away once stood on. Respawns after a delay. */
+  | 'collapsing'
+  /** Materialises and dematerialises on a fixed cycle. */
+  | 'phasing';
+
+/** A solid surface with optional dynamic behaviour. */
+export interface PlatformSpec {
+  x: number;
+  y: number;
+  width: number;
+  behaviour?: PlatformBehaviour;
+  /** `moving`: travel distance in px (sign sets initial direction). */
+  travelX?: number;
+  travelY?: number;
+  /** `moving`: one-way traversal time in ms. */
+  travelMs?: number;
+  /** `phasing`: ms visible, then ms absent. */
+  phaseOnMs?: number;
+  phaseOffMs?: number;
+  /** `phasing`: offset into the cycle so neighbours alternate. */
+  phaseOffsetMs?: number;
+}
+
+/** Stationary or cyclic dangers placed along the traversal route. */
+export type StaticHazardKind =
+  /** Always-on spike bed. Pure positioning challenge. */
+  | 'spikes'
+  /** Beam between two emitters, cycling warn -> active -> cooldown. */
+  | 'laser_gate'
+  /** Ground patch that pulses dangerous on a cycle. */
+  | 'corruption_zone';
+
+export interface StaticHazardSpec {
+  kind: StaticHazardKind;
+  x: number;
+  y: number;
+  width: number;
+  height?: number;
+  /** Cycle timing for `laser_gate` / `corruption_zone` (ms). */
+  warnMs?: number;
+  activeMs?: number;
+  cooldownMs?: number;
+  /** Offset into the cycle, so a row of gates fires in sequence. */
+  offsetMs?: number;
+}
+
+/** A relic placed deliberately rather than spawned at random. */
+export interface PickupSpec {
+  x: number;
+  y: number;
+  type: RelicType;
+}
+
 export interface ArenaGeometry {
   /** Total scrollable arena width; the camera is clamped to this. */
   worldWidth: number;
@@ -70,8 +132,22 @@ export interface ArenaGeometry {
   platforms: PlatformSpec[];
   playerSpawnX: number;
   bossSpawnX: number;
-  /** Level 1 only - animated molten river drawn under the ground lip. */
+  /** Animated molten river drawn under the ground lip. */
   hasLava: boolean;
+
+  /* ---- Hybrid traversal section (left of the arena) ---- */
+  /**
+   * World X where the boss arena begins. The player traverses everything to
+   * the left of this line; crossing it wakes Ra-One and seals the arena.
+   * Omit for a pure arena with no approach.
+   */
+  arenaStartX?: number;
+  /** Hazards placed along the approach. */
+  staticHazards?: StaticHazardSpec[];
+  /** Hand-placed relics rewarding exploration of the approach. */
+  pickups?: PickupSpec[];
+  /** Pits in the ground: [startX, endX] pairs. Falling in costs a unit. */
+  gaps?: Array<[number, number]>;
 }
 
 export interface BossMechanics {
@@ -87,6 +163,81 @@ export interface BossMechanics {
   projectileSpeedScale: number;
 }
 
+/* ===========================================================================
+   ENVIRONMENT
+   Every realm renders through one shared system; these values are the only
+   thing that differs between them, so no scene owns hard-coded colours.
+   =========================================================================== */
+
+/** How the distant silhouette band is shaped. */
+export type SkylineStyle =
+  | 'spires'    // pristine sky-fortress towers
+  | 'ridges'    // jagged volcanic rock
+  | 'shards'    // fractured floating slabs
+  | 'crystals'  // angular ice formations
+  | 'canopy'    // colossal overgrown trunks
+  | 'arena';    // the final colosseum
+
+/** Ambient particle behaviour. */
+export type AmbientKind = 'embers' | 'ash' | 'motes' | 'snow' | 'spores' | 'rain';
+
+export interface RealmEnvironment {
+  id: LevelId;
+  /** Painted key-art backdrop under the parallax layers. */
+  backdrop: string;
+
+  /* Sky gradient, top to horizon */
+  skyTop: number;
+  skyMid: number;
+  skyLow: number;
+  /** Horizon bloom colour and strength. */
+  haze: number;
+  hazeStrength: number;
+
+  /* Silhouette bands */
+  skylineStyle: SkylineStyle;
+  silhouetteFar: number;
+  silhouetteNear: number;
+  /** Energy rim picking out silhouette edges. */
+  rimFar: number;
+  rimNear: number;
+
+  /* Platform material */
+  platformTop: number;
+  platformBody: number;
+  platformDeep: number;
+  /** Energy seam running through the platform face. */
+  platformEnergy: number;
+
+  /* Ambience */
+  ambient: AmbientKind;
+  ambientTint: number;
+  /** Distant lightning / reality flashes. */
+  storm: boolean;
+  stormTint: number;
+
+  /**
+   * 0 = untouched Order, 1 = fully consumed by Entropy. Drives how much
+   * crimson bleeds into the silhouettes and platform seams, so the campaign
+   * reads as one world degrading rather than six unrelated biomes.
+   */
+  corruption: number;
+}
+
+/* ===========================================================================
+   DIFFICULTY
+   Explicit per-realm knobs instead of a blanket multiplier.
+   =========================================================================== */
+
+export interface DifficultySpec {
+  /** Ra-One's reaction delay scale; >1 is slower and more readable. */
+  bossTempoScale: number;
+  /** Multiplier on every hazard's warning window. >1 = more forgiving. */
+  hazardWarnScale: number;
+  /** Seconds between ambient relic spawns during the boss fight. */
+  relicSpawnSeconds: number;
+}
+
 export interface LevelConfig {
   id: LevelId;
   name: string;
@@ -96,8 +247,12 @@ export interface LevelConfig {
   gravity: number;
   arena: ArenaGeometry;
   bossMechanics: BossMechanics;
+  environment: RealmEnvironment;
+  difficulty: DifficultySpec;
   /** Line Ra-One delivers when the arena loads. */
   openingTaunt: string;
+  /** One-line brief shown as the realm begins. */
+  objective: string;
 }
 
 export interface GameSettings {

@@ -60,30 +60,7 @@ export const ACCENT = {
   void: 0x03060d,
 } as const;
 
-/** Level-specific atmosphere tints used by the parallax backdrops. */
-export const ATMOSPHERE = {
-  1: {
-    skyTop: 0x1a0406,
-    skyMid: 0x4a0b10,
-    skyLow: 0x8c2410,
-    haze: 0xff5a1e,
-    silhouette: 0x0d0203,
-    silhouetteFar: 0x2a0709,
-  },
-  2: {
-    skyTop: 0x030613,
-    skyMid: 0x0b1430,
-    skyLow: 0x1d2a57,
-    haze: 0x2f6bd0,
-    silhouette: 0x060a16,
-    silhouetteFar: 0x121c38,
-  },
-  3: {
-    skyTop: 0x000000,
-    skyMid: 0x04050f,
-    skyLow: 0x090a1c,
-    haze: 0x2a3cff,
-    silhouette: 0x02030a,
-    silhouetteFar: 0x080b1c,
-  },
-} as const;
+/* Per-realm atmosphere now lives in `data/realms.ts` as `REALMS`, which covers
+   all six environments and feeds the shared renderer in `art/realm.ts`. The
+   old three-entry ATMOSPHERE table (fire / city / void) was removed with the
+   three-level campaign it described. */

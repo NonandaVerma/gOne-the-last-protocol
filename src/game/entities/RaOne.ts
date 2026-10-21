@@ -149,6 +149,20 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.target = t;
   }
 
+  /**
+   * Wake a dormant boss.
+   *
+   * In the hybrid realms Ra-One is constructed without a target so he stands
+   * inert through the traversal approach (`update` early-returns with no
+   * target). Crossing the arena threshold calls this, which acquires the
+   * target and grants a grace delay before the first action so the player is
+   * never attacked during the entry beat.
+   */
+  public activate(t: Phaser.Physics.Arcade.Sprite, graceMs = 1600) {
+    this.target = t;
+    this.nextActionAt = this.scene.time.now + graceMs;
+  }
+
   private later(delay: number, fn: () => void) {
     const ev = this.scene.time.delayedCall(delay, () => {
       this.pending = this.pending.filter((p) => p !== ev);

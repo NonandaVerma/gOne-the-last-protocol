@@ -25,10 +25,16 @@ export class PreloadScene extends Phaser.Scene {
       color: '#00f0ff',
     }).setOrigin(0.5, 0.5);
 
-    // Preload high-resolution arena backgrounds
-    this.load.image('bg_level1', '/images/bg_level1.png');
-    this.load.image('bg_level2', '/images/bg_level2.png');
-    this.load.image('bg_level3', '/images/bg_level3.png');
+    /* Painted backdrop per realm. These reuse existing key art rather than
+       inventing asset paths — the filenames differ from the realm names
+       because the art predates the six-realm structure. */
+    this.load.image('bg_realm1', '/images/bg_arrival.png');   // sky fortress + fracture
+    this.load.image('bg_realm2', '/images/bg_level1.png');    // Infernal Fortress
+    this.load.image('bg_realm3', '/images/bg_defeat.png');    // Vortex Over Floating Ruins
+    this.load.image('bg_realm4', '/images/bg_realm4.png');    // Moonlit Citadel of the Frozen Sky
+    this.load.image('bg_realm5', '/images/bg_victory.png');   // Celestial Forest Sanctuary
+    this.load.image('bg_realm6', '/images/bg_level3.png');    // Crimson Rift: The Final Arena
+
     this.load.image('bg_arrival', '/images/bg_arrival.png');
 
     this.load.on('progress', (value: number) => {

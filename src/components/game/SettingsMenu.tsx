@@ -1,197 +1,197 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Volume2, Sliders, Eye, X, Maximize2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Eye, Maximize2, Minimize2, Volume2 } from 'lucide-react';
 import { GameSettings } from '../../game/types/game';
 import { SaveManager } from '../../game/systems/SaveManager';
 import { AudioManager } from '../../game/systems/AudioManager';
-import { EventBus, GAME_EVENTS } from '../../game/systems/EventBus';
+import { ModalShell } from '../ui/ModalShell';
+import { ProtocolButton } from '../ui/ProtocolButton';
 
 interface SettingsMenuProps {
   onClose: () => void;
 }
 
+/* ------------------------------------------------------------------ */
+/* Technical slider — cyan fill, notched thumb, live numeric readout.  */
+/* ------------------------------------------------------------------ */
+const VolumeSlider: React.FC<{
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}> = ({ label, value, onChange }) => {
+  const pct = Math.round(value * 100);
+  return (
+    <label className="flex flex-col gap-1.5">
+      <div className="flex justify-between items-baseline">
+        <span className="hud-label text-[0.58rem] text-steel">{label}</span>
+        <span className="font-ui text-[0.66rem] font-bold tabular-nums text-order-cyan">
+          {pct}%
+        </span>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        aria-label={label}
+        className="w-full h-1 appearance-none cursor-pointer bg-obsidian border border-steel/20 accent-order-cyan focus-protocol"
+        style={{
+          background: `linear-gradient(to right, #00CFFF 0%, #00CFFF ${pct}%, #070A0F ${pct}%, #070A0F 100%)`,
+        }}
+      />
+    </label>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/* Binary toggle — reads as a hardware switch, not a rounded pill.     */
+/* ------------------------------------------------------------------ */
+const Toggle: React.FC<{
+  label: string;
+  hint?: string;
+  enabled: boolean;
+  onToggle: () => void;
+}> = ({ label, hint, enabled, onToggle }) => (
+  <div className="flex items-center justify-between gap-4 py-1">
+    <div className="min-w-0">
+      <span className="font-ui text-xs font-semibold text-paper block">{label}</span>
+      {hint && <span className="font-body text-[0.66rem] text-muted/70">{hint}</span>}
+    </div>
+    <button
+      onClick={(e) => {
+        e.currentTarget.blur();
+        onToggle();
+      }}
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
+      className={[
+        'clip-notch border px-3 py-1 shrink-0 transition-all focus-protocol',
+        'font-ui text-[0.6rem] font-bold uppercase tracking-[0.16em]',
+        enabled
+          ? 'border-order-cyan/70 bg-order-deep text-order-cyan shadow-[0_0_14px_-3px_rgba(0,207,255,0.8)]'
+          : 'border-steel/25 bg-graphite text-muted/60',
+      ].join(' ')}
+    >
+      {enabled ? 'On' : 'Off'}
+    </button>
+  </div>
+);
+
 export const SettingsMenu: React.FC<SettingsMenuProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<GameSettings>(SaveManager.getSettings());
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const handleMasterChange = (val: number) => {
-    const updated = { ...settings, masterVolume: val };
+  useEffect(() => {
+    setIsFullscreen(Boolean(document.fullscreenElement));
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  /** Persist, then push the new mix straight into the live audio engine. */
+  const apply = (patch: Partial<GameSettings>) => {
+    const updated = { ...settings, ...patch };
     setSettings(updated);
     SaveManager.saveSettings(updated);
-    AudioManager.getInstance().setVolumes(updated.masterVolume, updated.musicVolume, updated.sfxVolume);
+    AudioManager.getInstance().setVolumes(
+      updated.masterVolume,
+      updated.musicVolume,
+      updated.sfxVolume
+    );
   };
 
-  const handleMusicChange = (val: number) => {
-    const updated = { ...settings, musicVolume: val };
-    setSettings(updated);
-    SaveManager.saveSettings(updated);
-    AudioManager.getInstance().setVolumes(updated.masterVolume, updated.musicVolume, updated.sfxVolume);
-  };
-
-  const handleSfxChange = (val: number) => {
-    const updated = { ...settings, sfxVolume: val };
-    setSettings(updated);
-    SaveManager.saveSettings(updated);
-    AudioManager.getInstance().setVolumes(updated.masterVolume, updated.musicVolume, updated.sfxVolume);
-  };
-
-  const toggleScreenShake = () => {
-    const updated = { ...settings, screenShake: !settings.screenShake };
-    setSettings(updated);
-    SaveManager.saveSettings(updated);
-  };
-
-  const toggleReducedMotion = () => {
-    const updated = { ...settings, reducedMotion: !settings.reducedMotion };
-    setSettings(updated);
-    SaveManager.saveSettings(updated);
-  };
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      /* Browser refused — leave the reported state alone. */
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 font-garamond">
-      <div className="bg-slate-950/95 border-2 border-amber-500/40 rounded-xl p-6 max-w-lg w-full shadow-[0_0_35px_rgba(245,158,11,0.25)] flex flex-col gap-6">
-        <div className="flex justify-between items-center border-b border-amber-900/40 pb-3">
+    <ModalShell
+      title="Configuration"
+      subtitle="Audio // Accessibility // Display"
+      faction="order"
+      width="max-w-lg"
+      onClose={onClose}
+      footer={
+        <ProtocolButton variant="order" size="md" onClick={onClose} className="w-full">
+          Close
+        </ProtocolButton>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        {/* ---- Audio ---- */}
+        <section className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-amber-400" />
-            <h2 className="font-cinzel font-bold text-xl text-amber-200 tracking-wider">
-              PROTOCOL CONFIGURATION
-            </h2>
+            <Volume2 className="w-4 h-4 text-order-cyan" />
+            <span className="hud-label text-order-ice">Audio</span>
           </div>
-          <button
-            onClick={(e) => {
-              e.currentTarget.blur();
-              onClose();
-            }}
-            className="p-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <VolumeSlider
+            label="Master"
+            value={settings.masterVolume}
+            onChange={(v) => apply({ masterVolume: v })}
+          />
+          <VolumeSlider
+            label="Music"
+            value={settings.musicVolume}
+            onChange={(v) => apply({ musicVolume: v })}
+          />
+          <VolumeSlider
+            label="Effects"
+            value={settings.sfxVolume}
+            onChange={(v) => apply({ sfxVolume: v })}
+          />
+        </section>
 
-        {/* Audio Volume Controls */}
-        <div className="flex flex-col gap-4">
-          <span className="text-xs font-cinzel tracking-widest text-amber-400 uppercase flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-amber-400" /> HARMONIC SUBSYSTEMS
-          </span>
+        <div className="seam-divider" aria-hidden="true" />
 
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-xs text-slate-300 font-cinzel">
-              <span>MASTER RESONANCE</span>
-              <span>{Math.round(settings.masterVolume * 100)}%</span>
+        {/* ---- Accessibility & display ---- */}
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Eye className="w-4 h-4 text-order-cyan" />
+            <span className="hud-label text-order-ice">Accessibility &amp; Display</span>
+          </div>
+
+          <Toggle
+            label="Screen Shake"
+            hint="Impact feedback on hits and explosions"
+            enabled={settings.screenShake}
+            onToggle={() => apply({ screenShake: !settings.screenShake })}
+          />
+          <Toggle
+            label="Reduced Motion"
+            hint="Suppresses ambient and decorative animation"
+            enabled={settings.reducedMotion}
+            onToggle={() => apply({ reducedMotion: !settings.reducedMotion })}
+          />
+
+          <div className="flex items-center justify-between gap-4 py-1">
+            <div className="min-w-0">
+              <span className="font-ui text-xs font-semibold text-paper block">Display Mode</span>
+              <span className="font-body text-[0.66rem] text-muted/70">
+                {isFullscreen ? 'Currently fullscreen' : 'Currently windowed'}
+              </span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={settings.masterVolume}
-              onChange={(e) => handleMasterChange(parseFloat(e.target.value))}
-              className="w-full accent-amber-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-xs text-slate-300 font-cinzel">
-              <span>SYNTHESIZER HYMN (BGM)</span>
-              <span>{Math.round(settings.musicVolume * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={settings.musicVolume}
-              onChange={(e) => handleMusicChange(parseFloat(e.target.value))}
-              className="w-full accent-amber-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-xs text-slate-300 font-cinzel">
-              <span>COMBAT IMPACTS (SFX)</span>
-              <span>{Math.round(settings.sfxVolume * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={settings.sfxVolume}
-              onChange={(e) => handleSfxChange(parseFloat(e.target.value))}
-              className="w-full accent-amber-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-            />
-          </div>
-        </div>
-
-        {/* Accessibility & Visual FX */}
-        <div className="flex flex-col gap-3 border-t border-amber-900/40 pt-4">
-          <span className="text-xs font-cinzel tracking-widest text-cyan-400 uppercase flex items-center gap-2">
-            <Eye className="w-4 h-4 text-cyan-400" /> ACCESSIBILITY & VISUAL AURA
-          </span>
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-200 font-garamond">Screen Quake Effects</span>
-            <button
-              onClick={(e) => {
-                e.currentTarget.blur();
-                toggleScreenShake();
-              }}
-              className={`px-3 py-1 rounded text-xs font-cinzel font-bold tracking-wider transition-colors ${
-                settings.screenShake ? 'bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.4)]' : 'bg-slate-800 text-slate-400'
-              }`}
+            <ProtocolButton
+              size="sm"
+              variant="neutral"
+              onClick={toggleFullscreen}
+              icon={
+                isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />
+              }
             >
-              {settings.screenShake ? 'ENABLED' : 'DISABLED'}
-            </button>
+              {isFullscreen ? 'Exit' : 'Fullscreen'}
+            </ProtocolButton>
           </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-200 font-garamond">Reduced Motion</span>
-            <button
-              onClick={(e) => {
-                e.currentTarget.blur();
-                toggleReducedMotion();
-              }}
-              className={`px-3 py-1 rounded text-xs font-cinzel font-bold tracking-wider transition-colors ${
-                settings.reducedMotion ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {settings.reducedMotion ? 'ENABLED' : 'DISABLED'}
-            </button>
-          </div>
-
-          <div className="flex justify-between items-center pt-2">
-            <span className="text-sm text-slate-200 font-garamond">Display Mode</span>
-            <button
-              onClick={(e) => {
-                e.currentTarget.blur();
-                toggleFullscreen();
-              }}
-              className="flex items-center gap-1.5 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-cinzel tracking-wider transition-colors"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-              FULLSCREEN
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={(e) => {
-            e.currentTarget.blur();
-            onClose();
-          }}
-          className="mt-2 w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-cinzel font-bold tracking-widest text-sm transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-        >
-          CONFIRM & CLOSE
-        </button>
+        </section>
       </div>
-    </div>
+    </ModalShell>
   );
 };

@@ -1,27 +1,30 @@
-import type { Metadata } from "next";
-import { Cinzel_Decorative, Cinzel, Cormorant_Garamond, Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Orbitron, Rajdhani, Inter } from "next/font/google";
 import "./globals.css";
 
-const cinzelDecorative = Cinzel_Decorative({
+/**
+ * TYPOGRAPHY — "Order vs Entropy" sci-fi system.
+ *
+ * Orbitron  : angular geometric display face. Logo lockups, screen titles.
+ * Rajdhani  : condensed technical sans. Buttons, HUD, labels, system text.
+ * Inter     : neutral body face. Descriptions, narrative copy, long form.
+ *
+ * Replaces the previous Cinzel / Cinzel Decorative / Cormorant Garamond
+ * stack, which read as Roman-Renaissance fantasy and fought the metallic
+ * sci-fi logo in the teaser key art.
+ */
+const orbitron = Orbitron({
   subsets: ["latin"],
-  variable: "--font-cinzel-decorative",
+  variable: "--font-orbitron",
   display: "swap",
-  weight: ["700", "900"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-const cinzel = Cinzel({
+const rajdhani = Rajdhani({
   subsets: ["latin"],
-  variable: "--font-cinzel",
+  variable: "--font-rajdhani",
   display: "swap",
-  weight: ["500", "600", "700", "800"],
-});
-
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  variable: "--font-cormorant",
-  display: "swap",
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 const inter = Inter({
@@ -33,7 +36,15 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "G-ONE: THE LAST PROTOCOL",
-  description: "A mythological dark-fantasy action platformer. Greek divine guardian vs Viking destroyer. Two forces. Three arenas. One final protocol.",
+  description:
+    "Reality is fracturing. A cosmic war between Order and Entropy — cyan protocol against crimson corruption across six collapsing realms.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#070A0F",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -45,11 +56,11 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${cinzelDecorative.variable} ${cinzel.variable} ${cormorant.variable} ${inter.variable}`}
+      className={`${orbitron.variable} ${rajdhani.variable} ${inter.variable}`}
     >
       <body
         suppressHydrationWarning
-        className="bg-[#03060d] text-slate-100 antialiased overflow-hidden min-h-screen font-inter select-none"
+        className="bg-obsidian text-paper antialiased overflow-hidden min-h-screen font-body select-none"
       >
         {children}
       </body>

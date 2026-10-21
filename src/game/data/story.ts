@@ -83,6 +83,40 @@ export const LEVEL_3_TRANSITION: StorySlide = {
   },
 };
 
+/**
+ * Narration shown when entering each realm after the first.
+ *
+ * Keyed by the realm being entered, so `REALM_TRANSITIONS[3]` plays on the way
+ * into Void Canyons. One world degrading, not six unrelated places.
+ */
+export const REALM_TRANSITIONS: Record<number, string[]> = {
+  2: [
+    'THE SKY-FORTRESS HAS FALLEN BEHIND YOU.',
+    'WHAT BURNS AHEAD WAS ONCE THE SAME STONE.',
+    'THE CORRUPTION HAS LEARNED TO SPREAD.',
+  ],
+  3: [
+    'THE PROTOCOL NO LONGER HOLDS THE BOUNDARY.',
+    'MATTER AND CODE BLEED INTO ONE ANOTHER.',
+    'NOTHING HERE WILL STAY BENEATH YOUR FEET.',
+  ],
+  4: [
+    'BEYOND THE RIFT, A FRAGMENT OF ORDER SURVIVES.',
+    'THE OBSERVATORY HAS WATCHED SINCE BEFORE THE FRACTURE.',
+    'ITS LIGHT-BRIDGES ANSWER ONLY TO TIMING.',
+  ],
+  5: [
+    'LIFE FOUND THE RUINS AND GREW THROUGH THEM.',
+    'IT GREW THROUGH THE CORRUPTION TOO.',
+    'EVERYTHING YOU HAVE LEARNED IS REQUIRED HERE.',
+  ],
+  6: [
+    'THE SEAM IS FULLY OPEN.',
+    'ORDER AND ENTROPY STAND ON THE SAME GROUND.',
+    'ONE FINAL STRIKE DECIDES THE EXISTENCE OF THIS WORLD.',
+  ],
+};
+
 export const DEFEAT_STORY = {
   header: 'DIVINE SHIELD SHATTERED',
   subtext: 'THE OLYMPIAN GUARDIAN HAS FALLEN // RAGNAROK HAS COMMENCED',

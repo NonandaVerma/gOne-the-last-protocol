@@ -10,13 +10,16 @@ import { bandRect, seeded } from '../art/draw';
  */
 export class DefeatScene extends Phaser.Scene {
   private currentLevel = 1;
+  /** True when the player died in the boss fight, so retry resumes there. */
+  private fromCheckpoint = false;
 
   constructor() {
     super({ key: 'DefeatScene' });
   }
 
-  init(data: { level?: number }) {
+  init(data: { level?: number; fromCheckpoint?: boolean }) {
     this.currentLevel = data?.level || 1;
+    this.fromCheckpoint = Boolean(data?.fromCheckpoint);
   }
 
   create() {
@@ -68,8 +71,12 @@ export class DefeatScene extends Phaser.Scene {
       },
     });
 
-    const onRetry = () => this.scene.start('ArenaScene', { level: this.currentLevel });
-    const onReplayStory = () => this.scene.start('StoryScene');
+    const onRetry = () =>
+      this.scene.start('ArenaScene', {
+        level: this.currentLevel,
+        fromCheckpoint: this.fromCheckpoint,
+      });
+    const onReplayStory = () => this.scene.start('ArenaScene', { level: 1, fromCheckpoint: false });
     const onQuit = () => this.scene.start('MainMenuScene');
 
     EventBus.once(GAME_EVENTS.RESTART_LEVEL, onRetry);

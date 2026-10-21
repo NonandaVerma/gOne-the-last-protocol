@@ -99,7 +99,13 @@ export class MainMenuScene extends Phaser.Scene {
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'MAIN_MENU');
     AudioManager.getInstance().playMusic('menu');
 
-    const onStart = () => this.scene.start('StoryScene');
+    // The opening cinematic is the React <IntroCinematic> video shown before
+    // this menu, so Play always drops straight into a realm — Realm I for a
+    // fresh run, or the furthest unlocked realm when resuming.
+    const onStart = (payload?: { level?: number }) => {
+      const level = payload?.level ?? 1;
+      this.scene.start('ArenaScene', { level, fromCheckpoint: false });
+    };
     EventBus.once(GAME_EVENTS.START_GAME, onStart);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

@@ -2,7 +2,6 @@ import * as Phaser from 'phaser';
 import { BootScene } from '../scenes/BootScene';
 import { PreloadScene } from '../scenes/PreloadScene';
 import { MainMenuScene } from '../scenes/MainMenuScene';
-import { StoryScene } from '../scenes/StoryScene';
 import { ArenaScene } from '../scenes/ArenaScene';
 import { VictoryScene } from '../scenes/VictoryScene';
 import { DefeatScene } from '../scenes/DefeatScene';
@@ -49,6 +48,9 @@ export const createGameConfig = (parent: HTMLElement): Phaser.Types.Core.GameCon
       windowEvents: true,
     },
     disableContextMenu: true,
-    scene: [BootScene, PreloadScene, MainMenuScene, StoryScene, ArenaScene, VictoryScene, DefeatScene],
+    // The opening cinematic is now the React <IntroCinematic> video; the old
+    // StoryScene (spaceship / starfield / code panels) has been retired so the
+    // game has exactly one startup sequence.
+    scene: [BootScene, PreloadScene, MainMenuScene, ArenaScene, VictoryScene, DefeatScene],
   };
 };

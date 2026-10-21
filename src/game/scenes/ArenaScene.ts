@@ -3,24 +3,29 @@ import { GOne } from '../entities/GOne';
 import { RaOne } from '../entities/RaOne';
 import { Projectile, createProjectilePool } from '../entities/Projectile';
 import { HazardManager } from '../entities/Hazard';
+import { StaticHazardField } from '../entities/StaticHazard';
+import { DynamicPlatformManager } from '../entities/DynamicPlatform';
 import { LEVELS, VIEW_W, VIEW_H } from '../data/levels';
-import { LEVEL_2_TRANSITION, LEVEL_3_TRANSITION } from '../data/story';
+import { REALM_TRANSITIONS } from '../data/story';
 import { AudioManager } from '../systems/AudioManager';
 import { SaveManager } from '../systems/SaveManager';
 import { Juice } from '../systems/Juice';
 import { Backdrop } from '../systems/Backdrop';
 import { EventBus, GAME_EVENTS } from '../systems/EventBus';
 import { HERO, VILLAIN } from '../art/palette';
-import { ArenaGeometry } from '../types/game';
+import { ArenaGeometry, LevelConfig, REALM_COUNT } from '../types/game';
 import { PowerUpManager, PowerUpPickup } from '../entities/PowerUp';
 
 /**
- * The playable arena. Owns the fight: geometry, camera, colliders, input and
- * the handful of state transitions (boss defeated -> next level, player dead
- * -> defeat screen) that tie a level together.
+ * A realm: a traversal approach followed by a boss arena.
  *
- * Gameplay logic itself lives on the entities (`GOne`, `RaOne`, `HazardManager`)
- * so this scene stays a thin wiring layer.
+ * The player starts at the far left and crosses the approach — platforms,
+ * gaps, placed hazards and relics — until they pass `arenaStartX`. That
+ * threshold wakes Ra-One, seals the arena and sets the checkpoint, so dying
+ * in the fight retries the fight rather than the whole approach.
+ *
+ * Gameplay logic lives on the entities (`GOne`, `RaOne`, the hazard and
+ * platform managers); this scene stays a wiring layer.
  */
 export class ArenaScene extends Phaser.Scene {
   public currentLevel = 1;
@@ -28,9 +33,11 @@ export class ArenaScene extends Phaser.Scene {
   private player?: GOne;
   private boss?: RaOne;
   private platforms?: Phaser.Physics.Arcade.StaticGroup;
+  private dynamicPlatforms?: DynamicPlatformManager;
   private playerProjectiles?: Phaser.Physics.Arcade.Group;
   private bossProjectiles?: Phaser.Physics.Arcade.Group;
   private hazards?: HazardManager;
+  private staticHazards?: StaticHazardField;
   private powerUps?: PowerUpManager;
   private crosshair?: Phaser.GameObjects.Image;
   private lockOn?: Phaser.GameObjects.Image;
@@ -41,6 +48,18 @@ export class ArenaScene extends Phaser.Scene {
   private isLevelEnding = false;
   private groundTop = 648;
   private worldWidth = 2240;
+
+  /* ---- Hybrid traversal state ---- */
+  private arenaStartX = 0;
+  /** True once the player has crossed the threshold and the fight is live. */
+  private arenaEntered = false;
+  /** Set when the player starts at (or reaches) the arena; drives retry. */
+  private startedAtCheckpoint = false;
+  /** Last ground position known to be safe, for pit respawns. */
+  private lastSafeX = 0;
+  private lastSafeY = 0;
+  private gaps: Array<[number, number]> = [];
+  private gateVisual?: Phaser.GameObjects.Rectangle;
 
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA?: Phaser.Input.Keyboard.Key;
@@ -60,18 +79,22 @@ export class ArenaScene extends Phaser.Scene {
     super({ key: 'ArenaScene' });
   }
 
-  init(data: { level?: number }) {
+  init(data: { level?: number; fromCheckpoint?: boolean }) {
     this.currentLevel = data?.level || 1;
     this.isPaused = false;
     this.isLevelEnding = false;
+    this.arenaEntered = false;
+    this.startedAtCheckpoint = Boolean(data?.fromCheckpoint);
     SaveManager.saveUnlockedLevel(this.currentLevel);
   }
 
   create() {
-    const config = LEVELS[this.currentLevel] || LEVELS[1];
+    const config: LevelConfig = LEVELS[this.currentLevel] || LEVELS[1];
     const arena = config.arena;
     this.groundTop = arena.groundTop;
     this.worldWidth = arena.worldWidth;
+    this.gaps = arena.gaps ?? [];
+    this.arenaStartX = arena.arenaStartX ?? 0;
 
     this.physics.world.gravity.y = config.gravity;
     this.physics.world.setBounds(0, 0, this.worldWidth, VIEW_H);
@@ -85,32 +108,58 @@ export class ArenaScene extends Phaser.Scene {
       subtitle: config.subtitle,
     });
 
-    AudioManager.getInstance().playMusic(this.currentLevel === 3 ? 'boss3' : 'battle');
+    AudioManager.getInstance().playMusic(this.currentLevel >= 5 ? 'boss3' : 'battle');
 
     this.juice = new Juice(this, 40);
     this.backdrop = new Backdrop(this, this.currentLevel, VIEW_W, VIEW_H);
 
     this.createGround(arena);
-    this.createPlatforms(arena);
+    this.createStaticPlatforms(arena);
 
     this.playerProjectiles = createProjectilePool(this, 48);
     this.bossProjectiles = createProjectilePool(this, 80);
     this.hazards = new HazardManager(this, this.juice, this.groundTop);
 
+    // Retrying after a death in the fight resumes at the arena mouth.
+    const spawnX = this.startedAtCheckpoint && this.arenaStartX
+      ? this.arenaStartX - 120
+      : arena.playerSpawnX;
+
     this.player = new GOne(
       this,
-      arena.playerSpawnX,
+      spawnX,
       this.groundTop - 120,
       this.playerProjectiles,
       this.juice,
       config.playerHealth
     );
+    this.lastSafeX = spawnX;
+    this.lastSafeY = this.groundTop - 120;
+
+    this.dynamicPlatforms = new DynamicPlatformManager(
+      this,
+      this.juice,
+      `platform_l${this.currentLevel}`,
+      arena.platforms.filter((p) => p.behaviour && p.behaviour !== 'static')
+    );
+
+    this.staticHazards = new StaticHazardField(
+      this,
+      this.juice,
+      this.hazards.getGroup(),
+      arena.staticHazards ?? [],
+      config.difficulty.hazardWarnScale
+    );
 
     this.powerUps = new PowerUpManager(this, this.juice, this.currentLevel);
     this.player.setPowerUpManager(this.powerUps);
     this.powerUps.setPlayer(this.player);
-    this.powerUps.startArenaSpawning(arena.platforms);
+    this.placePickups(arena, config.difficulty.relicSpawnSeconds);
 
+    /* Ra-One is built WITHOUT a target, so his update() early-returns and he
+       stands inert until the player crosses the threshold. Difficulty scales
+       his pacing here rather than inside the AI. */
+    const tempo = config.difficulty.bossTempoScale;
     this.boss = new RaOne({
       scene: this,
       x: arena.bossSpawnX,
@@ -119,11 +168,16 @@ export class ArenaScene extends Phaser.Scene {
       juice: this.juice,
       level: this.currentLevel,
       health: config.bossHealth,
-      mechanics: config.bossMechanics,
+      mechanics: {
+        ...config.bossMechanics,
+        attackIntervalMin: Math.round(config.bossMechanics.attackIntervalMin * tempo),
+        attackIntervalMax: Math.round(config.bossMechanics.attackIntervalMax * tempo),
+      },
       hazards: this.hazards,
       groundTop: this.groundTop,
     });
-    this.boss.setTarget(this.player);
+
+    this.createArenaGate();
 
     this.crosshair = this.add.image(VIEW_W / 2, VIEW_H / 2, 'crosshair_aim');
     this.crosshair.setDepth(45).setScrollFactor(0).setAlpha(0.9).setScale(0.9);
@@ -136,10 +190,16 @@ export class ArenaScene extends Phaser.Scene {
     this.setupInput();
     this.setupEventListeners();
 
-    this.pointerWorld = { x: arena.playerSpawnX + 300, y: this.groundTop - 100 };
+    this.pointerWorld = { x: spawnX + 300, y: this.groundTop - 100 };
     this.player.setAimTarget(this.pointerWorld.x, this.pointerWorld.y);
 
-    this.announceBoss(config.openingTaunt);
+    // Starting at the checkpoint means the fight is already joined.
+    if (this.startedAtCheckpoint || !this.arenaStartX) {
+      this.enterArena(config, true);
+    } else {
+      this.announceObjective(config.objective);
+    }
+
     this.syncHud();
   }
 
@@ -147,19 +207,28 @@ export class ArenaScene extends Phaser.Scene {
   // Geometry
   // ===========================================================================
 
+  /** True if `x` falls inside a pit. */
+  private isGap(x: number) {
+    return this.gaps.some(([a, b]) => x >= a && x <= b);
+  }
+
   private createGround(arena: ArenaGeometry) {
-    const key = this.currentLevel === 1 ? 'platform_l1' : this.currentLevel === 2 ? 'platform_l2' : 'platform_l3';
+    const key = `platform_l${this.currentLevel}`;
     this.platforms = this.physics.add.staticGroup();
 
     const tile = this.textures.get(key).getSourceImage();
-    const tileW = tile.width || 256;
-    const tileH = tile.height || 80;
+    const tileW = (tile as { width?: number }).width || 256;
+    const tileH = (tile as { height?: number }).height || 80;
     const groundThickness = 140;
     const scaleY = groundThickness / tileH;
 
     const count = Math.ceil(arena.worldWidth / tileW) + 1;
     for (let i = 0; i < count; i++) {
-      const seg = this.platforms.create(i * tileW + tileW / 2, arena.groundTop + groundThickness / 2, key);
+      const cx = i * tileW + tileW / 2;
+      // Omit segments that fall inside a pit. Tested at both edges so a tile
+      // is only dropped when it is genuinely inside the gap.
+      if (this.isGap(cx - tileW / 2) || this.isGap(cx + tileW / 2)) continue;
+      const seg = this.platforms.create(cx, arena.groundTop + groundThickness / 2, key);
       seg.setScale(1.02, scaleY).refreshBody();
     }
 
@@ -176,17 +245,52 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private createPlatforms(arena: ArenaGeometry) {
+  /** Only plain surfaces here; dynamic ones are owned by DynamicPlatformManager. */
+  private createStaticPlatforms(arena: ArenaGeometry) {
     if (!this.platforms) return;
-    const key = this.currentLevel === 1 ? 'platform_l1' : this.currentLevel === 2 ? 'platform_l2' : 'platform_l3';
+    const key = `platform_l${this.currentLevel}`;
     const tile = this.textures.get(key).getSourceImage();
-    const tileW = tile.width || 256;
-    const tileH = tile.height || 80;
+    const tileW = (tile as { width?: number }).width || 256;
+    const tileH = (tile as { height?: number }).height || 80;
 
-    arena.platforms.forEach((p) => {
-      const scaleX = p.width / tileW;
-      const plat = this.platforms!.create(p.x, p.y + tileH * 0.3, key);
-      plat.setScale(scaleX, 0.65).refreshBody();
+    arena.platforms
+      .filter((p) => !p.behaviour || p.behaviour === 'static')
+      .forEach((p) => {
+        const scaleX = p.width / tileW;
+        const plat = this.platforms!.create(p.x, p.y + tileH * 0.3, key);
+        plat.setScale(scaleX, 0.65).refreshBody();
+      });
+  }
+
+  private placePickups(arena: ArenaGeometry, relicSpawnSeconds: number) {
+    if (!this.powerUps) return;
+    // Hand-placed relics reward exploring the approach...
+    (arena.pickups ?? []).forEach((p) => {
+      this.powerUps!.spawnRelic(p.x, p.y, p.type);
+    });
+    // ...while the arena keeps its ambient spawns during the fight, at the
+    // cadence this realm's difficulty config asks for.
+    this.powerUps.startArenaSpawning(
+      arena.platforms.filter((p) => !this.arenaStartX || p.x >= this.arenaStartX),
+      relicSpawnSeconds
+    );
+  }
+
+  /** A visible seam marking where the approach ends and the fight begins. */
+  private createArenaGate() {
+    if (!this.arenaStartX) return;
+    this.gateVisual = this.add
+      .rectangle(this.arenaStartX, this.groundTop - 180, 6, 360, HERO.energy, 0.35)
+      .setDepth(8)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: this.gateVisual,
+      alpha: { from: 0.2, to: 0.7 },
+      scaleX: { from: 1, to: 2.4 },
+      duration: 1400,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
     });
   }
 
@@ -199,6 +303,50 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   // ===========================================================================
+  // Arena threshold
+  // ===========================================================================
+
+  /** Wake the boss, close the approach behind the player, set the checkpoint. */
+  private enterArena(config: LevelConfig, immediate = false) {
+    if (this.arenaEntered) return;
+    this.arenaEntered = true;
+    this.startedAtCheckpoint = true;
+
+    if (this.boss && this.player) {
+      this.boss.activate(this.player, immediate ? 1500 : 1900);
+      this.boss.setTarget(this.player);
+    }
+
+    if (this.gateVisual) {
+      // The seam flares shut: the approach is no longer the point.
+      this.tweens.killTweensOf(this.gateVisual);
+      this.tweens.add({
+        targets: this.gateVisual,
+        scaleX: 14,
+        alpha: 0,
+        duration: 650,
+        onComplete: () => this.gateVisual?.destroy(),
+      });
+      this.gateVisual = undefined;
+    }
+
+    if (!immediate) {
+      this.juice?.shake(0.012, 320);
+      AudioManager.getInstance().playOverdrive();
+    }
+
+    this.time.delayedCall(immediate ? 700 : 500, () => {
+      if (this.boss?.active) this.juice?.taunt(config.openingTaunt, VILLAIN.energy);
+    });
+  }
+
+  private announceObjective(objective: string) {
+    this.time.delayedCall(500, () => {
+      if (this.scene.isActive()) this.juice?.taunt(objective, HERO.energy);
+    });
+  }
+
+  // ===========================================================================
   // Colliders
   // ===========================================================================
 
@@ -208,11 +356,28 @@ export class ArenaScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.boss, this.platforms);
 
+    // Dynamic platforms carry the player; landing on a collapsing one arms it.
+    if (this.dynamicPlatforms) {
+      this.physics.add.collider(
+        this.player,
+        this.dynamicPlatforms.getGroup(),
+        (_playerObj, platObj) => {
+          const body = this.player?.body as Phaser.Physics.Arcade.Body | undefined;
+          // Only a genuine landing counts — brushing the underside does not.
+          if (body?.touching.down) {
+            this.dynamicPlatforms?.notifyLanded(platObj as Phaser.GameObjects.GameObject);
+          }
+        }
+      );
+    }
+
     if (this.playerProjectiles) {
       this.physics.add.overlap(this.playerProjectiles, this.boss, (bossObj, projObj) => {
         const proj = projObj as Projectile;
         const boss = bossObj as RaOne;
         if (!proj.active || !boss.active || proj.owner !== 'player' || this.isLevelEnding) return;
+        // A dormant boss cannot be sniped from across the approach.
+        if (!this.arenaEntered) return;
         if (!proj.registerHit(boss)) return;
 
         const rawDmg = proj.damage;
@@ -224,7 +389,7 @@ export class ArenaScene extends Phaser.Scene {
         if (!proj.pierce) proj.kill(true);
       });
 
-      // Arc Burst can also shred incoming boss shots - a visible reward for aiming well.
+      // Arc Burst can shred incoming boss shots — a visible reward for aiming well.
       if (this.bossProjectiles) {
         this.physics.add.overlap(this.playerProjectiles, this.bossProjectiles, (a, b) => {
           const pa = a as Projectile;
@@ -249,6 +414,8 @@ export class ArenaScene extends Phaser.Scene {
       });
     }
 
+    // One overlap covers boss-spawned debris AND placed static hazards, since
+    // StaticHazardField registers into the same group.
     if (this.hazards) {
       this.physics.add.overlap(this.hazards.getGroup(), this.player, (playerObj, hazardObj) => {
         const p = playerObj as GOne;
@@ -333,6 +500,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const onOverdriveBurst = (data: { x: number; y: number; radius: number; damage: number }) => {
       if (!this.boss || !this.boss.active || this.boss.bossState === 'defeated') return;
+      if (!this.arenaEntered) return;
       const dist = Phaser.Math.Distance.Between(data.x, data.y, this.boss.x, this.boss.y);
       if (dist <= data.radius) this.boss.takeDamage(data.damage);
     };
@@ -356,7 +524,7 @@ export class ArenaScene extends Phaser.Scene {
       if (this.isPaused) this.togglePause();
     };
     const onRestartLevel = () => this.restartLevel();
-    const onRestartStory = () => this.scene.start('StoryScene');
+    const onRestartStory = () => this.scene.start('ArenaScene', { level: 1, fromCheckpoint: false });
     const onQuitToMenu = () => this.scene.start('MainMenuScene');
 
     EventBus.on(GAME_EVENTS.SCREEN_SHAKE, onShake);
@@ -380,16 +548,14 @@ export class ArenaScene extends Phaser.Scene {
       EventBus.off(GAME_EVENTS.RESTART_STORY, onRestartStory);
       EventBus.off(GAME_EVENTS.QUIT_TO_MENU, onQuitToMenu);
       if (this.contextMenuHandler) this.game.canvas?.removeEventListener('contextmenu', this.contextMenuHandler);
+      // Teardown order matters: managers own timers and tweens that would
+      // otherwise fire against destroyed sprites on the next scene.
+      try { this.staticHazards?.destroy(); } catch (_) {}
+      try { this.dynamicPlatforms?.destroy(); } catch (_) {}
       try { this.hazards?.clearAll(); } catch (_) {}
       try { this.powerUps?.clearAll(); } catch (_) {}
       try { this.backdrop?.destroy(); } catch (_) {}
       try { this.juice?.clearFreeze(); } catch (_) {}
-    });
-  }
-
-  private announceBoss(taunt: string) {
-    this.time.delayedCall(900, () => {
-      if (this.boss?.active) this.juice?.taunt(taunt, VILLAIN.energy);
     });
   }
 
@@ -410,19 +576,25 @@ export class ArenaScene extends Phaser.Scene {
   // Transitions
   // ===========================================================================
 
-  private handleBossDefeated() {
+  private clearCombatObjects() {
     try {
-      if (this.bossProjectiles && (this.bossProjectiles as any).children && typeof (this.bossProjectiles as any).children.forEach === 'function') {
+      const kids = (this.bossProjectiles as unknown as { children?: unknown })?.children;
+      if (this.bossProjectiles && kids && typeof (kids as { forEach?: unknown }).forEach === 'function') {
         this.bossProjectiles.clear(true, true);
       }
     } catch (_) {}
     try { this.hazards?.clearAll(); } catch (_) {}
+    try { this.staticHazards?.destroy(); } catch (_) {}
     try { this.juice?.clearFreeze(); } catch (_) {}
+  }
 
-    if (this.currentLevel === 1) {
-      this.showLevelTransition(2, LEVEL_2_TRANSITION.text);
-    } else if (this.currentLevel === 2) {
-      this.showLevelTransition(3, LEVEL_3_TRANSITION.text);
+  private handleBossDefeated() {
+    this.clearCombatObjects();
+
+    const next = this.currentLevel + 1;
+    if (next <= REALM_COUNT) {
+      SaveManager.saveUnlockedLevel(next);
+      this.showLevelTransition(next, REALM_TRANSITIONS[next] ?? []);
     } else {
       EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'VICTORY');
       this.time.delayedCall(1200, () => {
@@ -436,14 +608,24 @@ export class ArenaScene extends Phaser.Scene {
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'LEVEL_TRANSITION');
 
     const overlay = this.add.graphics().setScrollFactor(0).setDepth(80).setAlpha(0);
-    overlay.fillStyle(0x000000, 0.92);
+    overlay.fillStyle(0x070a0f, 0.94);
     overlay.fillRect(0, 0, VIEW_W, VIEW_H);
 
+    // The dimensional seam as the transition device: a vertical fracture that
+    // expands across the screen before the next realm is revealed.
+    const seam = this.add
+      .rectangle(VIEW_W / 2, VIEW_H / 2, 4, VIEW_H, 0xffffff, 0.9)
+      .setScrollFactor(0)
+      .setDepth(83)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0);
+
+    const nextName = LEVELS[nextLevel]?.name ?? '';
     const txt = this.add
-      .text(VIEW_W / 2, VIEW_H / 2 - 40, storyLines.join('\n\n'), {
-        fontFamily: 'Cinzel, Georgia, serif',
+      .text(VIEW_W / 2, VIEW_H / 2 - 50, storyLines.join('\n\n'), {
+        fontFamily: 'Rajdhani, sans-serif',
         fontSize: '22px',
-        color: '#38bdf8',
+        color: '#9BAAB7',
         align: 'center',
         lineSpacing: 14,
       })
@@ -452,11 +634,11 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(81)
       .setAlpha(0);
 
-    const prompt = this.add
-      .text(VIEW_W / 2, VIEW_H / 2 + 130, '[ CLICK / PRESS SPACE TO ENTER NEXT ARENA ]', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '20px',
-        color: '#f59e0b',
+    const title = this.add
+      .text(VIEW_W / 2, VIEW_H / 2 + 80, nextName, {
+        fontFamily: 'Orbitron, sans-serif',
+        fontSize: '30px',
+        color: '#00CFFF',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
@@ -464,14 +646,24 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(82)
       .setAlpha(0);
 
-    this.tweens.add({ targets: [overlay, txt, prompt], alpha: 1, duration: 500 });
+    const prompt = this.add
+      .text(VIEW_W / 2, VIEW_H / 2 + 150, '[ CLICK OR PRESS SPACE TO CONTINUE ]', {
+        fontFamily: 'Rajdhani, sans-serif',
+        fontSize: '18px',
+        color: '#8395A5',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(82)
+      .setAlpha(0);
+
+    this.tweens.add({ targets: [overlay, txt, title, prompt, seam], alpha: 1, duration: 500 });
     this.tweens.add({
       targets: prompt,
-      scaleX: 1.05,
-      scaleY: 1.05,
+      alpha: { from: 0.4, to: 1 },
       yoyo: true,
       repeat: -1,
-      duration: 650,
+      duration: 800,
       ease: 'Sine.easeInOut',
     });
 
@@ -487,18 +679,22 @@ export class ArenaScene extends Phaser.Scene {
       });
       cleanupFns.length = 0;
 
-      try {
-        this.powerUps?.clearAll();
-      } catch (_) {}
+      try { this.powerUps?.clearAll(); } catch (_) {}
 
-      this.scene.restart({ level: nextLevel });
+      // Seam expands to fill the screen, then the next realm loads behind it.
+      this.tweens.add({
+        targets: seam,
+        scaleX: 400,
+        duration: 420,
+        ease: 'Quad.easeIn',
+        onComplete: () => this.scene.restart({ level: nextLevel, fromCheckpoint: false }),
+      });
     };
 
-    // Make interactive with hand cursor
     prompt.setInteractive({ useHandCursor: true });
     overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, VIEW_W, VIEW_H), Phaser.Geom.Rectangle.Contains);
 
-    // Brief 250ms debounce before accepting input so that combat clicks don't skip
+    // Brief debounce so a combat click does not skip the card instantly.
     this.time.delayedCall(250, () => {
       prompt.on('pointerdown', proceed);
       overlay.on('pointerdown', proceed);
@@ -521,26 +717,22 @@ export class ArenaScene extends Phaser.Scene {
       window.addEventListener('keydown', onWindowKey, { capture: true });
       cleanupFns.push(() => window.removeEventListener('keydown', onWindowKey, { capture: true }));
 
-      const onWindowClick = () => {
-        proceed();
-      };
+      const onWindowClick = () => proceed();
       window.addEventListener('pointerdown', onWindowClick, { capture: true });
       cleanupFns.push(() => window.removeEventListener('pointerdown', onWindowClick, { capture: true }));
     });
   }
 
   private handlePlayerDefeated() {
-    try {
-      if (this.bossProjectiles && (this.bossProjectiles as any).children && typeof (this.bossProjectiles as any).children.forEach === 'function') {
-        this.bossProjectiles.clear(true, true);
-      }
-    } catch (_) {}
-    try { this.hazards?.clearAll(); } catch (_) {}
-    try { this.juice?.clearFreeze(); } catch (_) {}
+    this.clearCombatObjects();
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'DEFEAT');
     this.time.delayedCall(900, () => {
       try { this.powerUps?.clearAll(); } catch (_) {}
-      this.scene.start('DefeatScene', { level: this.currentLevel });
+      this.scene.start('DefeatScene', {
+        level: this.currentLevel,
+        // Reaching the arena banks a checkpoint: retry resumes the fight.
+        fromCheckpoint: this.arenaEntered,
+      });
     });
   }
 
@@ -558,16 +750,34 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   public restartLevel() {
-    this.scene.restart({ level: this.currentLevel });
+    this.scene.restart({ level: this.currentLevel, fromCheckpoint: this.arenaEntered });
   }
 
   // ===========================================================================
   // Update
   // ===========================================================================
 
+  /**
+   * Falling into a pit costs one unit and returns the player to the last
+   * ground they stood on, rather than killing outright — a pit is a mistake,
+   * not an execution.
+   */
+  private handlePitFall() {
+    const p = this.player;
+    if (!p || p.isDead || this.isLevelEnding) return;
+
+    const body = p.body as Phaser.Physics.Arcade.Body;
+    body.setVelocity(0, 0);
+    p.setPosition(this.lastSafeX, this.lastSafeY - 40);
+    this.juice?.shake(0.01, 200);
+    p.takeDamage(1);
+  }
+
   update(time: number, delta: number) {
     this.juice?.update(time);
     this.powerUps?.update(time, delta);
+    this.staticHazards?.update(time, delta);
+    this.dynamicPlatforms?.update(time, delta);
 
     if (this.backdrop) {
       this.backdrop.update(this.cameras.main.scrollX, this.cameras.main.scrollY, delta);
@@ -578,7 +788,8 @@ export class ArenaScene extends Phaser.Scene {
       this.crosshair.setPosition(p.x, p.y);
     }
 
-    if (this.boss && this.boss.active && this.boss.bossState !== 'defeated') {
+    // Lock-on only reads as meaningful once the fight is actually live.
+    if (this.arenaEntered && this.boss && this.boss.active && this.boss.bossState !== 'defeated') {
       if (this.lockOn) {
         this.lockOn.setVisible(true);
         this.lockOn.setPosition(this.boss.x, this.boss.y - 14);
@@ -592,10 +803,29 @@ export class ArenaScene extends Phaser.Scene {
 
     if (this.isPaused || !this.player || !this.player.active) return;
 
-    this.player.setAimTarget(this.pointerWorld.x, this.pointerWorld.y);
+    const p = this.player;
+    const body = p.body as Phaser.Physics.Arcade.Body;
+
+    // Bank the last safe footing for pit respawns.
+    if (body?.blocked.down && !this.isGap(p.x)) {
+      this.lastSafeX = p.x;
+      this.lastSafeY = p.y;
+    }
+
+    // Pit check: the world floor sits below the ground line.
+    if (p.y > this.groundTop + 50 && !p.isDead) {
+      this.handlePitFall();
+    }
+
+    // Threshold crossing wakes the boss.
+    if (!this.arenaEntered && this.arenaStartX && p.x >= this.arenaStartX) {
+      this.enterArena(LEVELS[this.currentLevel] || LEVELS[1]);
+    }
+
+    p.setAimTarget(this.pointerWorld.x, this.pointerWorld.y);
 
     const isLeft = this.cursors?.left.isDown || this.keyA?.isDown;
     const isRight = this.cursors?.right.isDown || this.keyD?.isDown;
-    this.player.setMoveInput(isLeft ? -1 : isRight ? 1 : 0);
+    p.setMoveInput(isLeft ? -1 : isRight ? 1 : 0);
   }
 }

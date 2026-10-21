@@ -73,7 +73,7 @@ export class VictoryScene extends Phaser.Scene {
     }
 
     const onPlayAgain = () => this.scene.start('ArenaScene', { level: 1 });
-    const onReplayStory = () => this.scene.start('StoryScene');
+    const onReplayStory = () => this.scene.start('ArenaScene', { level: 1, fromCheckpoint: false });
     const onQuit = () => this.scene.start('MainMenuScene');
 
     EventBus.once(GAME_EVENTS.RESTART_LEVEL, onPlayAgain);

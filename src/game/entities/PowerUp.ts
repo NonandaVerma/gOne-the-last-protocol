@@ -4,63 +4,13 @@ import { EventBus, GAME_EVENTS } from '../systems/EventBus';
 import { AudioManager } from '../systems/AudioManager';
 import { Juice } from '../systems/Juice';
 import { GOne } from './GOne';
+import { RELIC_DEFINITIONS } from '../data/relics';
 
-export const RELIC_DEFINITIONS: Record<RelicType, RelicConfig> = {
-  aegis_olympus: {
-    id: 'aegis_olympus',
-    name: 'Aegis of Olympus',
-    tagline: 'Divine Barrier',
-    description: 'Athena surrounds G-One with a celestial shield absorbing incoming damage.',
-    icon: 'relic_aegis_olympus',
-    color: 0xf59e0b,
-    duration: 12000,
-  },
-  thunderheart: {
-    id: 'thunderheart',
-    name: 'Thunderheart',
-    tagline: 'Zeus Chain Lightning',
-    description: 'Overcharges primary Pulse Shots into electric thunderbolts that deal double damage.',
-    icon: 'relic_thunderheart',
-    color: 0x38bdf8,
-    duration: 10000,
-  },
-  phoenix_core: {
-    id: 'phoenix_core',
-    name: 'Phoenix Core',
-    tagline: 'Solar Rebirth',
-    description: 'Instantly restores 1 health unit (cannot exceed arena maximum).',
-    icon: 'relic_phoenix_core',
-    color: 0xf97316,
-    duration: 0,
-  },
-  hermes_step: {
-    id: 'hermes_step',
-    name: "Hermes' Step",
-    tagline: 'Winged Haste',
-    description: 'Grants +40% movement speed and halves dash cooldown with celestial wing trails.',
-    icon: 'relic_hermes_step',
-    color: 0x06b6d4,
-    duration: 12000,
-  },
-  overdrive_shard: {
-    id: 'overdrive_shard',
-    name: 'Overdrive Shard',
-    tagline: 'Olympian Surge',
-    description: 'Instantly infuses +50 Overdrive charge to unleash Final Overdrive sooner.',
-    icon: 'relic_overdrive_shard',
-    color: 0xa855f7,
-    duration: 0,
-  },
-  rune_of_ruin: {
-    id: 'rune_of_ruin',
-    name: 'Rune of Ruin',
-    tagline: 'Berserker Oath',
-    description: 'Risk / Reward: Grants +100% damage output, but all incoming hits inflict +1 extra damage.',
-    icon: 'relic_rune_of_ruin',
-    color: 0xdc2626,
-    duration: 14000,
-  },
-};
+/**
+ * Relic presentation data lives in `../data/relics` (Phaser-free) so React
+ * UI can import it during SSR. Re-exported here for existing call sites.
+ */
+export { RELIC_DEFINITIONS };
 
 /**
  * Floating Relic Pickup Sprite in the arena.
@@ -197,17 +147,24 @@ export class PowerUpManager {
 
   /**
    * Start recurring relic spawns across arena platforms.
+   *
+   * @param intervalSeconds per-realm cadence from `LevelConfig.difficulty`.
+   *        Harder realms space relics further apart; the final realm tightens
+   *        again so a long fight still offers recovery.
    */
-  public startArenaSpawning(platformCoords: Array<{ x: number; y: number }>) {
+  public startArenaSpawning(
+    platformCoords: Array<{ x: number; y: number }>,
+    intervalSeconds = 18
+  ) {
     if (platformCoords.length === 0) return;
 
     // Initial spawn on one of the platforms
     const firstPlat = Phaser.Utils.Array.GetRandom(platformCoords);
     this.spawnRelic(firstPlat.x, firstPlat.y - 45);
 
-    // Recurring spawn every 18 seconds if fewer than 2 active on screen
+    // Recurring spawn if fewer than 2 are active on screen
     this.spawnTimer = this.scene.time.addEvent({
-      delay: 18000,
+      delay: Math.max(4000, intervalSeconds * 1000),
       loop: true,
       callback: () => {
         if (this.group.getLength() < 2) {

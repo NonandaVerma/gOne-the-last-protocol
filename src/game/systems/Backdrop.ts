@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { ACCENT, HERO, VILLAIN } from '../art/palette';
+import { RealmEnvironment, AmbientKind } from '../types/game';
+import { REALMS } from '../data/realms';
 import { SaveManager } from './SaveManager';
 
 interface Layer {
@@ -7,159 +8,147 @@ interface Layer {
   factorX: number;
   /** Continuous self-scroll, px/sec (drifting haze, flowing lava). */
   driftX?: number;
-  factorY?: number;
 }
 
+/** Per-kind ambient particle tuning. One table instead of a method each. */
+const AMBIENT: Record<
+  AmbientKind,
+  {
+    texture: string;
+    fromBottom: boolean;
+    speedY: [number, number];
+    speedX: [number, number];
+    scale: [number, number];
+    alpha: number;
+    lifespan: [number, number];
+    frequency: number;
+    additive: boolean;
+  }
+> = {
+  embers: {
+    texture: 'particle_ember', fromBottom: true,
+    speedY: [-140, -46], speedX: [-46, 46], scale: [0.9, 0],
+    alpha: 0.9, lifespan: [2600, 5200], frequency: 90, additive: true,
+  },
+  ash: {
+    texture: 'particle_smoke', fromBottom: false,
+    speedY: [30, 90], speedX: [-40, 10], scale: [0.5, 0.1],
+    alpha: 0.4, lifespan: [4000, 7000], frequency: 120, additive: false,
+  },
+  motes: {
+    texture: 'particle_shard', fromBottom: false,
+    speedY: [-26, 26], speedX: [-26, 26], scale: [0.5, 0],
+    alpha: 0.55, lifespan: [3200, 5200], frequency: 150, additive: true,
+  },
+  snow: {
+    texture: 'particle_white', fromBottom: false,
+    speedY: [40, 110], speedX: [-50, 20], scale: [0.5, 0.2],
+    alpha: 0.65, lifespan: [5000, 8000], frequency: 70, additive: false,
+  },
+  spores: {
+    texture: 'particle_blue', fromBottom: true,
+    speedY: [-50, -14], speedX: [-24, 24], scale: [0.45, 0],
+    alpha: 0.7, lifespan: [4200, 7200], frequency: 130, additive: true,
+  },
+  rain: {
+    texture: 'particle_white', fromBottom: false,
+    speedY: [520, 780], speedX: [-140, -70], scale: [0.3, 0.3],
+    alpha: 0.26, lifespan: [1500, 1800], frequency: 24, additive: false,
+  },
+};
+
 /**
- * Multi-plane parallax backdrop.
+ * Multi-plane parallax backdrop, driven entirely by a `RealmEnvironment`.
  *
- * Layers are screen-space tile sprites whose `tilePositionX` is driven from the
- * camera scroll, which keeps them perfectly seamless over an arena far wider
- * than the viewport and costs a handful of draw calls instead of thousands of
- * Graphics commands per frame.
+ * Layers are screen-space tile sprites whose `tilePositionX` is derived from
+ * camera scroll, which keeps them seamless across an arena far wider than the
+ * viewport at a handful of draw calls rather than thousands of Graphics
+ * commands per frame.
+ *
+ * Previously this class branched per level with hard-coded texture keys and
+ * colours; all six realms now run the same code path and differ only by config.
  */
 export class Backdrop {
   private scene: Phaser.Scene;
   private layers: Layer[] = [];
   private owned: Phaser.GameObjects.GameObject[] = [];
-  private level: number;
+  private env: RealmEnvironment;
   private stormTimer?: Phaser.Time.TimerEvent;
 
   constructor(scene: Phaser.Scene, level: number, viewW: number, viewH: number) {
     this.scene = scene;
-    this.level = level;
+    this.env = REALMS[level] ?? REALMS[1];
+    const env = this.env;
 
     const reduced = SaveManager.getSettings().reducedMotion;
 
-    // --- Sky & High-Res Background Art (locked to camera) -------------------
-    const bgKey = `bg_level${level}`;
-    const hasArt = scene.textures.exists(bgKey);
-    const skyKey = hasArt ? bgKey : `sky_${level}`;
-    const sky = scene.add
-      .image(0, 0, skyKey)
-      .setOrigin(0, 0)
-      .setScrollFactor(0)
-      .setDepth(-100);
-    sky.setDisplaySize(viewW, viewH);
-    this.owned.push(sky);
+    // --- Painted key art if present, else the procedural sky --------------
+    const hasArt = scene.textures.exists(env.backdrop);
+    const skyKey = hasArt ? env.backdrop : `sky_${env.id}`;
+    if (scene.textures.exists(skyKey)) {
+      const sky = scene.add
+        .image(0, 0, skyKey)
+        .setOrigin(0, 0)
+        .setScrollFactor(0)
+        .setDepth(-100);
+      sky.setDisplaySize(viewW, viewH);
+      this.owned.push(sky);
+    }
 
-    const push = (
-      key: string,
-      y: number,
-      h: number,
-      factorX: number,
-      depth: number,
-      alpha = 1,
-      driftX?: number
-    ) => {
+    const push = (key: string, y: number, h: number, factorX: number, depth: number, alpha: number, driftX?: number) => {
       if (!scene.textures.exists(key)) return;
       const t = scene.add
         .tileSprite(0, y, viewW, h, key)
         .setOrigin(0, 0)
         .setScrollFactor(0)
         .setDepth(depth)
-        .setAlpha(hasArt ? alpha * 0.65 : alpha);
+        // Painted art already carries most of the depth cue, so the generated
+        // bands sit back when it is present and lead when it is not.
+        .setAlpha(hasArt ? alpha * 0.55 : alpha);
       this.layers.push({ sprite: t, factorX, driftX: reduced ? 0 : driftX });
       this.owned.push(t);
     };
 
-    if (level === 1) {
-      push('cloud_band', 40, 260, 0.04, -92, 0.6, 5);
-      push('far_1', viewH - 500, 420, 0.14, -90, 0.7);
-      push('mid_1', viewH - 480, 480, 0.3, -80, 0.8);
-      push('near_1', viewH - 300, 320, 0.56, -70, 0.9);
-      this.ambientEmbers(viewW, viewH);
-    } else if (level === 2) {
-      push('cloud_band', 20, 260, 0.03, -92, 0.45, 4);
-      push('far_2', viewH - 520, 460, 0.13, -90, 0.65);
-      push('mid_2', viewH - 540, 520, 0.3, -80, 0.75);
-      push('near_2', viewH - 330, 340, 0.58, -70, 0.85);
-      this.ambientRain(viewW, viewH);
-      this.storm(viewW, viewH);
-    } else {
-      push('grid_3', 0, viewH, 0.1, -95, 0.4, 8);
-      push('far_3', viewH - 560, 480, 0.16, -90, 0.6);
-      push('mid_3', viewH - 560, 520, 0.34, -80, 0.75);
-      push('near_3', viewH - 300, 300, 0.6, -70, 0.85);
-      this.ambientMotes(viewW, viewH);
-      this.storm(viewW, viewH);
+    // Sky realms get a drifting cloud band; the rest read better without it.
+    if (env.skylineStyle === 'spires' || env.skylineStyle === 'crystals') {
+      push('cloud_band', 30, 260, 0.04, -92, 0.5, 5);
     }
+
+    push(`far_${env.id}`, viewH - 500, 420, 0.14, -90, 0.7);
+    push(`mid_${env.id}`, viewH - 500, 480, 0.3, -80, 0.8);
+    push(`near_${env.id}`, viewH - 300, 320, 0.58, -70, 0.9);
+
+    if (!reduced) this.ambient(viewW, viewH);
+    if (env.storm) this.storm(viewW, viewH);
   }
 
   // -------------------------------------------------------------------------
 
-  private ambientEmbers(viewW: number, viewH: number) {
-    if (!this.scene.textures.exists('particle_ember')) return;
-    const embers = this.scene.add.particles(0, 0, 'particle_ember', {
-      x: { min: 0, max: viewW },
-      y: viewH + 10,
-      speedY: { min: -140, max: -46 },
-      speedX: { min: -46, max: 46 },
-      scale: { start: 0.9, end: 0 },
-      alpha: { start: 0.9, end: 0 },
-      lifespan: { min: 2600, max: 5200 },
-      frequency: 90,
-      blendMode: Phaser.BlendModes.ADD,
-      quantity: 2,
-    });
-    embers.setScrollFactor(0).setDepth(-60);
-    this.owned.push(embers);
+  /** One particle emitter, configured from the realm's ambient kind. */
+  private ambient(viewW: number, viewH: number) {
+    const spec = AMBIENT[this.env.ambient];
+    // Fall back gracefully if the texture factory did not produce this key.
+    const texture = this.scene.textures.exists(spec.texture) ? spec.texture : 'particle_white';
+    if (!this.scene.textures.exists(texture)) return;
 
-    const smoke = this.scene.add.particles(0, 0, 'particle_smoke', {
+    const emitter = this.scene.add.particles(0, 0, texture, {
       x: { min: 0, max: viewW },
-      y: viewH - 40,
-      speedY: { min: -36, max: -12 },
-      speedX: { min: -16, max: 16 },
-      scale: { start: 0.6, end: 2.6 },
-      alpha: { start: 0.2, end: 0 },
-      lifespan: 6000,
-      frequency: 420,
-      tint: 0x7a2a16,
+      y: spec.fromBottom ? viewH + 10 : { min: -20, max: viewH * 0.4 },
+      speedY: { min: spec.speedY[0], max: spec.speedY[1] },
+      speedX: { min: spec.speedX[0], max: spec.speedX[1] },
+      scale: { start: spec.scale[0], end: spec.scale[1] },
+      alpha: { start: spec.alpha, end: 0 },
+      lifespan: { min: spec.lifespan[0], max: spec.lifespan[1] },
+      frequency: spec.frequency,
+      quantity: 1,
+      tint: this.env.ambientTint,
+      ...(spec.additive ? { blendMode: Phaser.BlendModes.ADD } : {}),
     });
-    smoke.setScrollFactor(0.2).setDepth(-65);
-    this.owned.push(smoke);
+    emitter.setScrollFactor(0).setDepth(-60);
+    this.owned.push(emitter);
   }
 
-  private ambientRain(viewW: number, viewH: number) {
-    if (!this.scene.textures.exists('particle_white')) return;
-    const rain = this.scene.add.particles(0, 0, 'particle_white', {
-      x: { min: -80, max: viewW + 80 },
-      y: -20,
-      speedY: { min: 520, max: 780 },
-      speedX: { min: -140, max: -70 },
-      scaleX: 0.12,
-      scaleY: { start: 1.5, end: 1.5 },
-      alpha: { start: 0.26, end: 0.08 },
-      lifespan: 1600,
-      frequency: 24,
-      quantity: 2,
-      tint: 0x9fc6ff,
-    });
-    rain.setScrollFactor(0).setDepth(-55);
-    this.owned.push(rain);
-    void viewH;
-  }
-
-  private ambientMotes(viewW: number, viewH: number) {
-    if (!this.scene.textures.exists('particle_shard_blue')) return;
-    const motes = this.scene.add.particles(0, 0, 'particle_shard_blue', {
-      x: { min: 0, max: viewW },
-      y: { min: 0, max: viewH },
-      speedY: { min: -26, max: 26 },
-      speedX: { min: -26, max: 26 },
-      scale: { start: 0.5, end: 0 },
-      alpha: { start: 0.55, end: 0 },
-      rotate: { min: 0, max: 360 },
-      lifespan: 4200,
-      frequency: 160,
-      blendMode: Phaser.BlendModes.ADD,
-      tint: [HERO.energy, VILLAIN.energy],
-    });
-    motes.setScrollFactor(0.3).setDepth(-58);
-    this.owned.push(motes);
-  }
-
-  /** Occasional distant lightning that briefly rim-lights the whole arena. */
+  /** Occasional distant flash that briefly rim-lights the whole arena. */
   private storm(viewW: number, viewH: number) {
     if (SaveManager.getSettings().reducedMotion) return;
     if (!this.scene.textures.exists('lightning_streak')) return;
@@ -172,11 +161,11 @@ export class Backdrop {
         .setDepth(-75)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setAlpha(0)
+        .setTint(this.env.stormTint)
         .setScale(Phaser.Math.FloatBetween(0.8, 1.5));
-      if (this.level === 3) streak.setTint(Phaser.Math.Between(0, 1) ? HERO.energy : VILLAIN.energy);
 
       const glow = this.scene.add
-        .rectangle(0, 0, viewW, viewH, this.level === 3 ? HERO.energy : VILLAIN.energy, 0.06)
+        .rectangle(0, 0, viewW, viewH, this.env.stormTint, 0.06)
         .setOrigin(0, 0)
         .setScrollFactor(0)
         .setDepth(-74)
@@ -227,8 +216,4 @@ export class Backdrop {
   }
 }
 
-export const AMBIENT_TINT: Record<number, number> = {
-  1: ACCENT.magma,
-  2: HERO.energy,
-  3: VILLAIN.energy,
-};
+export { AMBIENT_TINT } from '../data/realms';
