@@ -66,6 +66,14 @@ export class ArenaScene extends Phaser.Scene {
   /** Guards the Realm 6 finale escalation so it fires exactly once. */
   private finaleEscalated = false;
 
+  /* ---- Stage tracking for Level 1 ---- */
+  private currentStageIndex = 1;
+  private stageCheckpoints = [180, 1400, 2680, 3960, 5260];
+  private announcedStages = new Set<number>();
+  private altarSprite?: Phaser.GameObjects.Sprite;
+  private fragmentSprite?: Phaser.GameObjects.Sprite;
+  private fragmentAbsorbed = false;
+
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA?: Phaser.Input.Keyboard.Key;
   private keyD?: Phaser.Input.Keyboard.Key;
@@ -91,6 +99,9 @@ export class ArenaScene extends Phaser.Scene {
     this.arenaEntered = false;
     this.finaleEscalated = false;
     this.startedAtCheckpoint = Boolean(data?.fromCheckpoint);
+    this.currentStageIndex = 1;
+    this.announcedStages.clear();
+    this.fragmentAbsorbed = false;
     SaveManager.saveUnlockedLevel(this.currentLevel);
   }
 
@@ -201,6 +212,7 @@ export class ArenaScene extends Phaser.Scene {
     this.setupColliders();
     this.setupInput();
     this.setupEventListeners();
+    this.createStage5Sanctuary();
 
     this.pointerWorld = { x: spawnX + 300, y: this.groundTop - 100 };
     this.player.setAimTarget(this.pointerWorld.x, this.pointerWorld.y);
@@ -210,6 +222,11 @@ export class ArenaScene extends Phaser.Scene {
       this.enterArena(config, true);
     } else {
       this.announceObjective(config.objective);
+      if (this.currentLevel === 1) {
+        this.time.delayedCall(400, () => {
+          this.checkStageProgression(spawnX);
+        });
+      }
     }
 
     this.syncHud();
@@ -450,7 +467,7 @@ export class ArenaScene extends Phaser.Scene {
           const body = this.player?.body as Phaser.Physics.Arcade.Body | undefined;
           // Only a genuine landing counts — brushing the underside does not.
           if (body?.touching.down) {
-            this.dynamicPlatforms?.notifyLanded(platObj as Phaser.GameObjects.GameObject);
+            this.dynamicPlatforms?.notifyLanded(platObj as Phaser.GameObjects.GameObject, this.player);
           }
         }
       );
@@ -547,7 +564,11 @@ export class ArenaScene extends Phaser.Scene {
       this.keyK.on('down', () => this.player?.activateShield());
       this.keyL.on('down', () => this.player?.fireArcBurst());
       this.keyShift.on('down', () => this.player?.performDash());
-      this.keyE.on('down', () => this.player?.activateOverdrive());
+      this.keyE.on('down', () => {
+        if (!this.tryEnvironmentalInteraction()) {
+          this.player?.activateOverdrive();
+        }
+      });
       this.keyEsc.on('down', () => this.togglePause());
       this.keyW.on('down', () => this.player?.pressJump());
       this.keyW.on('up', () => this.player?.releaseJump());
@@ -564,8 +585,12 @@ export class ArenaScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       AudioManager.getInstance().resume();
-      if (pointer.leftButtonDown()) this.player?.firePulseShot();
-      else if (pointer.rightButtonDown()) this.player?.activateShield();
+      if (pointer.leftButtonDown()) {
+        if (this.tryEnvironmentalInteraction({ x: pointer.worldX, y: pointer.worldY })) return;
+        this.player?.firePulseShot();
+      } else if (pointer.rightButtonDown()) {
+        this.player?.activateShield();
+      }
     });
 
     this.contextMenuHandler = (e: Event) => e.preventDefault();
@@ -661,6 +686,8 @@ export class ArenaScene extends Phaser.Scene {
       try { this.powerUps?.clearAll(); } catch (_) {}
       try { this.backdrop?.destroy(); } catch (_) {}
       try { this.juice?.clearFreeze(); } catch (_) {}
+      try { this.altarSprite?.destroy(); } catch (_) {}
+      try { this.fragmentSprite?.destroy(); } catch (_) {}
     });
   }
 
@@ -695,6 +722,36 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleBossDefeated() {
+    try {
+      const kids = (this.bossProjectiles as unknown as { children?: unknown })?.children;
+      if (this.bossProjectiles && kids && typeof (kids as { forEach?: unknown }).forEach === 'function') {
+        this.bossProjectiles.clear(true, true);
+      }
+    } catch (_) {}
+    try { this.hazards?.clearAll(); } catch (_) {}
+    try { this.enemies?.destroy(); } catch (_) {}
+    try { this.juice?.clearFreeze(); } catch (_) {}
+
+    if (this.currentLevel === 1) {
+      // Re-enable progression: Level 1 has a playable physical Stage 5 sanctuary!
+      this.isLevelEnding = false;
+
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: "The Corrupted Guardian falls! The sanctuary seal to the east has deactivated. Proceed forward to claim the Protocol Fragment.",
+        speaker: 'SYSTEM',
+        duration: 5500,
+        priority: 2,
+      });
+      EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+        title: 'SANCTUARY UNLOCKED',
+        instruction: 'Ra-One neutralized. Head East past x:5120 into Stage 5 to claim the Protocol Fragment.',
+        timeout: 7000,
+      });
+
+      EventBus.emit('open_stage5_gate');
+      return;
+    }
+
     this.clearCombatObjects();
 
     const next = this.currentLevel + 1;
@@ -775,7 +832,7 @@ export class ArenaScene extends Phaser.Scene {
     // rather than a click-anywhere dismissal, matching the "contextual
     // interaction, absorption, reward" sequence other realms don't have art
     // for yet.
-    const isFragmentBeat = hasStageArt && this.currentLevel === 1;
+    const isFragmentBeat = hasStageArt && this.currentLevel === 1 && !this.fragmentAbsorbed;
 
     const prompt = this.add
       .text(
@@ -956,7 +1013,7 @@ export class ArenaScene extends Phaser.Scene {
   /**
    * Falling into a pit costs one unit and returns the player to the last
    * ground they stood on, rather than killing outright — a pit is a mistake,
-   * not an execution.
+   * not an execution. Clamps safely to the stage checkpoint if lastSafeX is inside a gap.
    */
   private handlePitFall() {
     const p = this.player;
@@ -964,16 +1021,240 @@ export class ArenaScene extends Phaser.Scene {
 
     const body = p.body as Phaser.Physics.Arcade.Body;
     body.setVelocity(0, 0);
-    p.setPosition(this.lastSafeX, this.lastSafeY - 40);
-    this.juice?.shake(0.01, 200);
+
+    let respawnX = this.lastSafeX;
+    let respawnY = this.lastSafeY;
+
+    if (this.isGap(respawnX) || respawnX <= 0) {
+      const stageIdx = this.getCurrentStageIndex(p.x);
+      respawnX = this.stageCheckpoints[stageIdx - 1] ?? 180;
+      respawnY = this.groundTop - 120;
+    }
+
+    p.setPosition(respawnX, respawnY - 40);
+    this.juice?.shake(0.012, 220);
     p.takeDamage(1);
+  }
+
+  // ===========================================================================
+  // Level 1: Stages 1–5 Progression, Sanctuary Altar & Fragment
+  // ===========================================================================
+
+  private createStage5Sanctuary() {
+    if (this.currentLevel !== 1) return;
+
+    const altarX = 5800;
+    const altarY = 580;
+
+    const altarKey = this.textures.exists('protocol_altar') ? 'protocol_altar' : 'hazard_emitter';
+    this.altarSprite = this.add.sprite(altarX, altarY - 24, altarKey);
+    this.altarSprite.setDepth(15);
+
+    const fragKey = this.textures.exists('protocol_fragment') ? 'protocol_fragment' : 'particle_white';
+    this.fragmentSprite = this.add.sprite(altarX, altarY - 110, fragKey);
+    this.fragmentSprite.setDepth(26);
+
+    this.tweens.add({
+      targets: this.fragmentSprite,
+      y: altarY - 128,
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    this.tweens.add({
+      targets: this.fragmentSprite,
+      scale: { from: 0.95, to: 1.15 },
+      alpha: { from: 0.85, to: 1 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    this.fragmentSprite.setInteractive({ useHandCursor: true });
+    this.fragmentSprite.on('pointerdown', () => {
+      if (this.player && Math.abs(this.player.x - altarX) <= 220) {
+        this.collectProtocolFragment();
+      }
+    });
+  }
+
+  private collectProtocolFragment() {
+    if (this.fragmentAbsorbed || this.isLevelEnding) return;
+    this.fragmentAbsorbed = true;
+    this.isLevelEnding = true;
+
+    AudioManager.getInstance().playRelicCollect();
+    this.juice?.shake(0.016, 400);
+    this.juice?.zoomPunch(0.06, 350);
+
+    const fx = this.fragmentSprite ? this.fragmentSprite.x : 5800;
+    const fy = this.fragmentSprite ? this.fragmentSprite.y : 470;
+    this.juice?.impact(fx, fy, 'player', { scale: 2.4, sparks: 36, ring: true });
+
+    if (this.fragmentSprite) {
+      this.tweens.add({
+        targets: this.fragmentSprite,
+        scale: 2.5,
+        alpha: 0,
+        y: fy - 50,
+        duration: 380,
+        ease: 'Quad.easeOut',
+        onComplete: () => this.fragmentSprite?.destroy(),
+      });
+    }
+
+    EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+      text: 'PROTOCOL FRAGMENT 01 SECURED. The shattered sky stabilizes... Synchronizing data stream for Realm 2.',
+      speaker: 'G-ONE',
+      duration: 4800,
+      priority: 2,
+    });
+
+    EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+      title: 'PROTOCOL SYNCHRONIZED',
+      instruction: 'Core fragment absorbed. Establishing conduit link to the Rust Wastes...',
+      timeout: 5000,
+    });
+
+    SaveManager.saveUnlockedLevel(2);
+    this.time.delayedCall(1600, () => {
+      this.showLevelTransition(2, REALM_TRANSITIONS[2] ?? []);
+    });
+  }
+
+  private tryEnvironmentalInteraction(pointerPos?: { x: number; y: number }): boolean {
+    if (!this.player || this.player.isDead || this.isLevelEnding) return false;
+
+    // Stage 5 Fragment
+    if (this.currentLevel === 1 && !this.fragmentAbsorbed && this.fragmentSprite?.active) {
+      const distToAltar = Math.abs(this.player.x - 5800);
+      const clickedNear = pointerPos
+        ? Phaser.Math.Distance.Between(pointerPos.x, pointerPos.y, 5800, 470) <= 90
+        : false;
+
+      if (distToAltar <= 180 || clickedNear) {
+        this.collectProtocolFragment();
+        return true;
+      }
+    }
+
+    // Static Hazard / Terminal interaction
+    if (this.staticHazards) {
+      const interacted = this.staticHazards.tryInteract(this.player.x);
+      if (interacted) {
+        this.juice?.shake(0.006, 120);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private getCurrentStageIndex(x: number): number {
+    if (this.currentLevel !== 1) return 1;
+    if (x < 1300) return 1;
+    if (x < 2600) return 2;
+    if (x < 3900) return 3;
+    if (x < 5200) return 4;
+    return 5;
+  }
+
+  private checkStageProgression(playerX: number) {
+    if (this.currentLevel !== 1) return;
+    const stage = this.getCurrentStageIndex(playerX);
+    if (stage !== this.currentStageIndex) {
+      this.currentStageIndex = stage;
+    }
+
+    if (!this.announcedStages.has(stage)) {
+      this.announcedStages.add(stage);
+      this.triggerStageNarrative(stage);
+    }
+  }
+
+  private triggerStageNarrative(stage: number) {
+    switch (stage) {
+      case 1:
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: 'Stage 1: Awakening — Auxiliary power offline. Access the Power Relay console to override the security blast door.',
+          speaker: 'SYSTEM',
+          duration: 5200,
+          priority: 2,
+        });
+        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+          title: 'STAGE 1: AWAKENING',
+          instruction: 'Move with [A]/[D], Jump with [W]/[Space]. Approach the Power Relay console at x:720 and press [E] to restore power.',
+          timeout: 6500,
+        });
+        break;
+      case 2:
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: 'Stage 2: Sky Sentinels — Aerial patrol detected. Deploy Aegis Shield to deflect incoming plasma barrages.',
+          speaker: 'G-ONE',
+          duration: 5200,
+          priority: 2,
+        });
+        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+          title: 'STAGE 2: SKY SENTINELS',
+          instruction: 'Step on Launch Pads to scale vertical catwalks. Press [K] or Right-Click to raise Aegis Shield and reflect laser volleys.',
+          timeout: 6500,
+        });
+        break;
+      case 3:
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: 'Stage 3: The Shattered Bridge — The structure is crumbling over the abyss. Traverse quickly before platforms collapse.',
+          speaker: 'SYSTEM',
+          duration: 5200,
+          priority: 2,
+        });
+        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+          title: 'STAGE 3: THE SHATTERED BRIDGE',
+          instruction: 'Stepping on fractured bridge fragments triggers collapse in 0.7s. Jump decisively across 160-240px gaps.',
+          timeout: 6500,
+        });
+        break;
+      case 4:
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: 'Stage 4: The Corrupted Guardian — Ra-One has compromised the primary defense core. Beware his kinetic plating!',
+          speaker: 'G-ONE',
+          duration: 5200,
+          priority: 2,
+        });
+        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+          title: 'STAGE 4: THE CORRUPTED GUARDIAN',
+          instruction: 'Ra-One deflects basic Pulse fire during windup. Evade his telegraphed strikes, then counter-attack during his 1.4s exposed cooling phase.',
+          timeout: 7000,
+        });
+        break;
+      case 5:
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: 'Stage 5: Protocol Fragment — The sanctuary core resonates. Approach the altar to claim the fragment.',
+          speaker: 'SYSTEM',
+          duration: 5200,
+          priority: 2,
+        });
+        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+          title: 'STAGE 5: PROTOCOL FRAGMENT',
+          instruction: 'Approach the altar at x:5800. Press [E] or Click the Fragment to absorb Protocol Fragment 01.',
+          timeout: 7000,
+        });
+        break;
+    }
   }
 
   update(time: number, delta: number) {
     this.juice?.update(time);
     this.powerUps?.update(time, delta);
     this.staticHazards?.update(time, delta);
-    if (this.player) this.staticHazards?.checkTrigger(this.player.x);
+    if (this.player) {
+      this.staticHazards?.checkTrigger(this.player.x);
+      if (!this.player.isDead) {
+        this.checkStageProgression(this.player.x);
+      }
+    }
     this.staticHazards?.updateGuardGroups((g) => this.enemies?.isGroupAlive(g) ?? false);
     this.dynamicPlatforms?.update(time, delta);
     this.enemies?.update(time);

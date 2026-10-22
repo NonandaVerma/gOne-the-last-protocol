@@ -67,23 +67,26 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
   const [phase, setPhase] = useState<Phase>('loading');
   const [muted, setMuted] = useState(false);
   const [cue, setCue] = useState<Cue | null>(null);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const finishedRef = useRef(false);
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    setIsFadingOut(true);
 
-    const v = videoRef.current;
-    if (v) {
-      try {
-        v.pause();
-        v.removeAttribute('src');
-        v.load();
-      } catch {
-        /* element already torn down */
+    // Give 420ms for smooth cinematic fade-to-black before unmounting
+    window.setTimeout(() => {
+      const v = videoRef.current;
+      if (v) {
+        try {
+          v.pause();
+        } catch {
+          /* element already torn down */
+        }
       }
-    }
-    onFinish();
+      onFinish();
+    }, 420);
   }, [onFinish]);
 
   // No footage configured for this realm — resolve immediately. Declared as
@@ -260,6 +263,14 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
           </button>
         </div>
       )}
+
+      {/* Smooth cinematic black dissolve to prevent blank canvas or white flash */}
+      <div
+        className={`absolute inset-0 bg-obsidian pointer-events-none z-50 transition-opacity duration-400 ${
+          isFadingOut ? 'opacity-100' : 'opacity-0'
+        }`}
+        aria-hidden="true"
+      />
     </div>
   );
 };

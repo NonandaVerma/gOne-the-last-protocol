@@ -101,6 +101,15 @@ export const GAME_EVENTS = {
   ACTIVE_RELICS_CHANGED: 'active-relics-changed',
   LEVEL_COMPLETED: 'level-completed',
 
+  // Narration & Subtitles
+  SHOW_SUBTITLE: 'show-subtitle',
+  HIDE_SUBTITLE: 'hide-subtitle',
+
+  // Tutorials & Instructions
+  SHOW_TUTORIAL: 'show-tutorial',
+  HIDE_TUTORIAL: 'hide-tutorial',
+  INTERACTION_PROMPT: 'interaction-prompt',
+
   // Input triggers from React UI (e.g. mobile virtual buttons or HUD clicks)
   TRIGGER_MOVE_LEFT: 'trigger-move-left',
   TRIGGER_MOVE_RIGHT: 'trigger-move-right',

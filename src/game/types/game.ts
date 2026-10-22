@@ -74,7 +74,9 @@ export type PlatformBehaviour =
   /** Cracks, shudders, then drops away once stood on. Respawns after a delay. */
   | 'collapsing'
   /** Materialises and dematerialises on a fixed cycle. */
-  | 'phasing';
+  | 'phasing'
+  /** Kinetic jump pad that boosts the player upward. */
+  | 'launch';
 
 /** A solid surface with optional dynamic behaviour. */
 export interface PlatformSpec {
@@ -92,6 +94,8 @@ export interface PlatformSpec {
   phaseOffMs?: number;
   /** `phasing`: offset into the cycle so neighbours alternate. */
   phaseOffsetMs?: number;
+  /** `launch`: upward impulse velocity (defaults to -1150). */
+  launchVelocityY?: number;
 }
 
 /** Stationary or cyclic dangers placed along the traversal route. */
@@ -114,7 +118,11 @@ export type StaticHazardKind =
    * defeated, then opens once, permanently. The "clear the defenders to
    * breach the gate" encounter beat — progression-gated, not timed.
    */
-  | 'locked_gate';
+  | 'locked_gate'
+  /** Blast door / security bulkhead. */
+  | 'door'
+  /** Interactive power relay or terminal console. */
+  | 'terminal';
 
 export interface StaticHazardSpec {
   kind: StaticHazardKind;
@@ -122,6 +130,9 @@ export interface StaticHazardSpec {
   y: number;
   width: number;
   height?: number;
+  hazardId?: string;
+  gateId?: string;
+  requiresTrigger?: boolean;
   /** Cycle timing for `laser_gate` / `corruption_zone` (ms). */
   warnMs?: number;
   activeMs?: number;
@@ -136,6 +147,10 @@ export interface StaticHazardSpec {
   holdMs?: number;
   /** `locked_gate` only: the `EnemySpec.guardGroup` id that must be cleared. */
   guardGroup?: string;
+  /** `terminal` only: interactive prompt and event identifier. */
+  label?: string;
+  prompt?: string;
+  eventKey?: string;
 }
 
 /** A relic placed deliberately rather than spawned at random. */

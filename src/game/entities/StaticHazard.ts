@@ -2,9 +2,10 @@ import * as Phaser from 'phaser';
 import { StaticHazardSpec } from '../types/game';
 import { AudioManager } from '../systems/AudioManager';
 import { Juice } from '../systems/Juice';
+import { EventBus, GAME_EVENTS } from '../systems/EventBus';
 
 /**
- * PLACED ENVIRONMENTAL HAZARDS.
+ * PLACED ENVIRONMENTAL HAZARDS & INTERACTIVE TERMINALS.
  *
  * Every cyclic hazard runs the same four-phase lifecycle:
  *
@@ -61,6 +62,12 @@ interface LockedGate {
   opened: boolean;
 }
 
+interface InteractiveTerminal {
+  spec: StaticHazardSpec;
+  sprite: Phaser.GameObjects.Sprite;
+  activated: boolean;
+}
+
 export class StaticHazardField {
   private scene: Phaser.Scene;
   private juice: Juice;
@@ -68,8 +75,10 @@ export class StaticHazardField {
   private cyclic: Cyclic[] = [];
   private doors: SecurityDoor[] = [];
   private gates: LockedGate[] = [];
+  private terminals: InteractiveTerminal[] = [];
   private owned: Phaser.GameObjects.GameObject[] = [];
   private alive = true;
+  private promptActive = false;
   /**
    * Sealed doors/gates need genuine physical blocking, not the shared
    * damage group — that group is wired to the player via `physics.add
@@ -78,6 +87,8 @@ export class StaticHazardField {
    * gets its own `collider` from the scene instead.
    */
   private solidGroup: Phaser.Physics.Arcade.Group;
+
+  private eventListeners: Array<[string, (...args: any[]) => void]> = [];
 
   /**
    * @param group  shared damage group the scene already overlaps with the
@@ -99,8 +110,9 @@ export class StaticHazardField {
 
     specs.forEach((spec) => {
       if (spec.kind === 'spikes') this.buildSpikes(spec);
-      else if (spec.kind === 'security_door') this.buildSecurityDoor(spec, warnScale);
+      else if (spec.kind === 'security_door' || spec.kind === 'door') this.buildSecurityDoor(spec, warnScale);
       else if (spec.kind === 'locked_gate') this.buildLockedGate(spec);
+      else if (spec.kind === 'terminal') this.buildTerminal(spec);
       else this.buildCyclic(spec, warnScale);
     });
   }
@@ -134,35 +146,47 @@ export class StaticHazardField {
 
   private buildSecurityDoor(spec: StaticHazardSpec, warnScale: number) {
     const height = spec.height ?? 220;
+    const startsClosed = Boolean(spec.eventKey || spec.requiresTrigger);
     const openY = spec.y - height - 20;
     const closedY = spec.y - height / 2;
 
     const top = this.scene.add.image(spec.x, spec.y - height - 12, 'hazard_door_housing').setDepth(17);
     this.owned.push(top);
 
-    const panel = this.scene.physics.add.sprite(spec.x, openY, 'hazard_door_panel');
+    const initialY = startsClosed ? closedY : openY;
+    const panel = this.scene.physics.add.sprite(spec.x, initialY, 'hazard_door_panel');
     panel.setDisplaySize(spec.width, height).setDepth(16);
 
     const body = panel.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
     body.setImmovable(true);
-    body.enable = false;
+    body.enable = startsClosed;
 
     this.solidGroup.add(panel);
     this.owned.push(panel);
 
-    this.doors.push({
+    const door: SecurityDoor = {
       spec,
       panel,
       openY,
       closedY,
-      phase: 'open',
+      phase: startsClosed ? 'sealed' : 'open',
       remaining: 0,
       warnMs: Math.round((spec.warnMs ?? 900) * warnScale),
       closeMs: spec.closeMs ?? 700,
       holdMs: spec.holdMs ?? 2500,
       triggered: false,
-    });
+    };
+
+    if (spec.eventKey) {
+      const onDoorOpen = () => {
+        this.openDoor(door);
+      };
+      EventBus.on(spec.eventKey, onDoorOpen);
+      this.eventListeners.push([spec.eventKey, onDoorOpen]);
+    }
+
+    this.doors.push(door);
   }
 
   /** Scene calls this every frame with the player's world X. */
@@ -177,6 +201,20 @@ export class StaticHazardField {
         d.triggered = true;
         this.armDoor(d);
       }
+    }
+
+    const nearby = this.terminals.find((t) => !t.activated && Math.abs(playerX - t.spec.x) <= 85);
+    if (nearby) {
+      if (!this.promptActive) {
+        this.promptActive = true;
+        EventBus.emit(GAME_EVENTS.INTERACTION_PROMPT, {
+          text: nearby.spec.prompt ?? `[E] ${nearby.spec.label ?? 'ACTIVATE'}`,
+          active: true,
+        });
+      }
+    } else if (this.promptActive) {
+      this.promptActive = false;
+      EventBus.emit(GAME_EVENTS.INTERACTION_PROMPT, { active: false });
     }
   }
 
@@ -262,7 +300,87 @@ export class StaticHazardField {
     this.solidGroup.add(panel);
     this.owned.push(panel);
 
+    if (spec.eventKey) {
+      const onGateOpen = () => {
+        this.openGateByEvent(spec.eventKey!);
+      };
+      EventBus.on(spec.eventKey, onGateOpen);
+      this.eventListeners.push([spec.eventKey, onGateOpen]);
+    }
+
     this.gates.push({ spec, panel, openY, closedY, opened: false });
+  }
+
+  public openGateByEvent(eventKey: string) {
+    for (const gate of this.gates) {
+      if (gate.opened || gate.spec.eventKey !== eventKey) continue;
+      gate.opened = true;
+      const body = gate.panel.body as Phaser.Physics.Arcade.Body;
+      body.enable = false;
+      AudioManager.getInstance().playOverdrive();
+      this.juice.shake(0.008, 220);
+      this.scene.tweens.add({
+        targets: gate.panel,
+        y: gate.openY,
+        alpha: 0.3,
+        duration: 650,
+        ease: 'Quad.easeOut',
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Interactive terminal / power relay
+  // -------------------------------------------------------------------------
+
+  private buildTerminal(spec: StaticHazardSpec) {
+    const key = this.scene.textures.exists('interactive_terminal')
+      ? 'interactive_terminal'
+      : 'hazard_emitter';
+    const sprite = this.scene.add.sprite(spec.x, spec.y - 32, key).setDepth(12);
+    this.owned.push(sprite);
+
+    // Idle glow tween
+    this.scene.tweens.add({
+      targets: sprite,
+      alpha: { from: 0.85, to: 1 },
+      duration: 750,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.terminals.push({
+      spec,
+      sprite,
+      activated: false,
+    });
+  }
+
+  public tryInteract(playerX: number): boolean {
+    const t = this.terminals.find((term) => !term.activated && Math.abs(playerX - term.spec.x) <= 85);
+    if (!t) return false;
+
+    t.activated = true;
+    AudioManager.getInstance().playRelicCollect();
+    this.juice.impact(t.spec.x, t.spec.y - 16, 'player', { scale: 1.2, sparks: 16, ring: true });
+    t.sprite.setTint(0xe8faff);
+    this.scene.tweens.add({
+      targets: t.sprite,
+      scale: 1.15,
+      duration: 180,
+      yoyo: true,
+    });
+
+    this.promptActive = false;
+    EventBus.emit(GAME_EVENTS.INTERACTION_PROMPT, { active: false });
+    if (t.spec.eventKey) {
+      EventBus.emit(t.spec.eventKey, { id: t.spec.label, x: t.spec.x });
+    }
+    return true;
+  }
+
+  public isTerminalActivated(eventKey: string): boolean {
+    return this.terminals.some((t) => t.spec.eventKey === eventKey && t.activated);
   }
 
   /**
@@ -428,6 +546,7 @@ export class StaticHazardField {
 
     for (const d of this.doors) {
       if (d.phase === 'open') continue;
+      if (d.spec.eventKey && d.phase === 'sealed') continue;
       d.remaining -= delta;
       if (d.remaining > 0) continue;
       switch (d.phase) {
@@ -447,6 +566,10 @@ export class StaticHazardField {
 
   public destroy() {
     this.alive = false;
+    this.eventListeners.forEach(([evt, fn]) => {
+      EventBus.off(evt, fn);
+    });
+    this.eventListeners = [];
     this.cyclic.forEach((h) => {
       this.scene.tweens.killTweensOf(h.sprite);
     });

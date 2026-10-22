@@ -235,9 +235,14 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
   }
 
   private finishAction(recoverMs: number) {
-    this.enter('recover', recoverMs);
-    this.later(recoverMs, () => {
+    const finalRecover = Math.max(recoverMs, 1400);
+    this.enter('recover', finalRecover);
+    this.setTint(0x7fe3ff); // Cooling / exposed tint
+    this.juice.floatText(this.x, this.y - 80, 'EXPOSED', 0x00cfff, 16);
+
+    this.later(finalRecover, () => {
       if (this.bossState === 'recover') {
+        this.clearTint();
         this.busy = false;
         this.bossState = 'idle';
         this.play('raone-idle', true);
@@ -678,15 +683,27 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
   public takeDamage(amount = 1): boolean {
     if (this.isInvulnerable || this.bossState === 'defeated') return false;
 
-    this.currentHealth = Math.max(0, this.currentHealth - amount);
+    // KINETIC ARMOR: Basic pulse shots while boss is winding up or attacking are deflected.
+    // Forces player to use Aegis Shield / Phase Dash to defend, rather than spamming shoot.
+    if ((this.bossState === 'telegraph' || this.bossState === 'attack') && amount <= 1) {
+      AudioManager.getInstance().playShieldDeflect();
+      this.juice.impact(this.x, this.y - 16, 'boss', { scale: 0.6, sparks: 6 });
+      return false;
+    }
+
+    // VULNERABILITY WINDOW: Attacks during 'recover' deal bonus damage!
+    const isExposed = this.bossState === 'recover';
+    const effectiveDamage = isExposed ? amount + 1 : amount;
+
+    this.currentHealth = Math.max(0, this.currentHealth - effectiveDamage);
     AudioManager.getInstance().playHit();
 
-    this.juice.hitStop(amount > 1 ? 85 : 55);
-    this.juice.shake(0.01 + amount * 0.004, 220);
+    this.juice.hitStop(effectiveDamage > 1 ? 85 : 55);
+    this.juice.shake(0.01 + effectiveDamage * 0.004, 220);
     this.juice.impact(this.x, this.y - 16, 'player', {
-      scale: 1 + amount * 0.3,
-      sparks: 10 + amount * 6,
-      ring: amount > 1,
+      scale: 1 + effectiveDamage * 0.3,
+      sparks: 10 + effectiveDamage * 6,
+      ring: effectiveDamage > 1,
     });
 
     EventBus.emit(GAME_EVENTS.BOSS_HEALTH_CHANGED, {
@@ -701,8 +718,8 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
 
     this.refreshPhase();
 
-    // Staggering out of a telegraph is the player's reward for pressure.
-    if (this.bossState === 'telegraph' || this.bossState === 'idle' || this.bossState === 'recover') {
+    // Heavy strikes (Arc Burst / Overdrive) or attacks during the recover window stagger the boss
+    if (isExposed || amount >= 2) {
       this.clearPending();
       this.ring?.setVisible(false);
       this.beamGuide?.clear();

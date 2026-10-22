@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { ACCENT, VILLAIN } from './palette';
-import { bandRect, bolt, forge, path, poly, rand, seeded } from './draw';
+import { bandRect, bolt, forge, outline, path, poly, rand, seeded } from './draw';
 import { buildAllRealms } from './realm';
 
 /**
@@ -118,5 +118,115 @@ export function buildArena(scene: Phaser.Scene) {
     }
     g.fillStyle(ACCENT.emberHot, 0.5);
     g.fillRect(0, 0, 512, 4);
+  });
+
+  // Interactive Power Relay & Data Terminal (used in Stage 1 & Stage 5)
+  forge(scene, 'interactive_terminal', 48, 64, (g) => {
+    // Pedestal base
+    g.fillStyle(0x1a2332, 1);
+    g.fillRect(4, 32, 40, 32);
+    g.lineStyle(2, 0x4a6d87, 0.9);
+    g.strokeRect(4, 32, 40, 32);
+
+    // Angled terminal head
+    poly(g, [{ x: 2, y: 32 }, { x: 46, y: 32 }, { x: 42, y: 8 }, { x: 6, y: 8 }], 0x0b1120, 1);
+    outline(g, [{ x: 2, y: 32 }, { x: 46, y: 32 }, { x: 42, y: 8 }, { x: 6, y: 8 }], 0x00cfff, 0.85, 2);
+
+    // Glowing holographic interface screen
+    g.fillStyle(0x00cfff, 0.85);
+    g.fillRect(10, 12, 28, 16);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillRect(14, 15, 20, 2);
+    g.fillRect(14, 19, 14, 2);
+    g.fillRect(14, 23, 17, 2);
+
+    // Pulsing energy core light at base
+    g.fillStyle(0x00cfff, 1);
+    g.fillCircle(24, 48, 5);
+  });
+
+  // Stage 2: Vertical Launch Pad / Kinetic Jump Pad
+  forge(scene, 'launch_pad', 64, 24, (g) => {
+    // Heavy base housing
+    g.fillStyle(0x16293a, 1);
+    g.fillRect(2, 8, 60, 16);
+    g.lineStyle(2, 0x4a6d87, 0.9);
+    g.strokeRect(2, 8, 60, 16);
+
+    // Center kinetic energy plate
+    g.fillStyle(0x00cfff, 0.9);
+    g.fillRect(12, 4, 40, 6);
+    g.lineStyle(1.5, 0xe8faff, 1);
+    g.strokeRect(12, 4, 40, 6);
+
+    // Upward chevron arrows signaling launch
+    for (let i = 0; i < 3; i++) {
+      const cx = 20 + i * 12;
+      poly(g, [{ x: cx - 4, y: 20 }, { x: cx, y: 14 }, { x: cx + 4, y: 20 }], 0x00cfff, 0.85);
+    }
+  });
+
+  // Stage 5: Protocol Altar Pedestal
+  forge(scene, 'protocol_altar', 96, 72, (g) => {
+    // Stepped divine dais
+    g.fillStyle(0x16293a, 1);
+    g.fillRect(6, 48, 84, 24);
+    g.lineStyle(2, 0x00cfff, 0.8);
+    g.strokeRect(6, 48, 84, 24);
+
+    // Central pillar
+    g.fillStyle(0x2b3a4d, 1);
+    g.fillRect(20, 16, 56, 32);
+    g.lineStyle(1.5, 0xe8faff, 0.7);
+    g.strokeRect(20, 16, 56, 32);
+
+    // Upper offering lip with harmonic sigil
+    g.fillStyle(0x00cfff, 0.9);
+    g.fillRect(14, 10, 68, 6);
+    g.fillCircle(48, 32, 8);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(48, 32, 3);
+  });
+
+  // Stage 5: The Protocol Fragment Crystal
+  forge(scene, 'protocol_fragment', 48, 48, (g) => {
+    // Radiant crystalline shard
+    poly(
+      g,
+      [
+        { x: 24, y: 4 },
+        { x: 42, y: 18 },
+        { x: 36, y: 44 },
+        { x: 12, y: 44 },
+        { x: 6, y: 18 },
+      ],
+      0x00cfff,
+      0.95
+    );
+    // Inner facets
+    poly(
+      g,
+      [
+        { x: 24, y: 8 },
+        { x: 36, y: 20 },
+        { x: 24, y: 38 },
+        { x: 12, y: 20 },
+      ],
+      0xffffff,
+      0.85
+    );
+    outline(
+      g,
+      [
+        { x: 24, y: 4 },
+        { x: 42, y: 18 },
+        { x: 36, y: 44 },
+        { x: 12, y: 44 },
+        { x: 6, y: 18 },
+      ],
+      0xe8faff,
+      1,
+      2
+    );
   });
 }

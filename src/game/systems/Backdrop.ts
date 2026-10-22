@@ -138,9 +138,15 @@ export class Backdrop {
       push('cloud_band', 30, 260, 0.04, -92, 0.5, 5);
     }
 
-    push(`far_${env.id}`, viewH - 500, 420, 0.14, -90, 0.7);
-    push(`mid_${env.id}`, viewH - 500, 480, 0.3, -80, 0.8);
-    push(`near_${env.id}`, viewH - 300, 320, 0.58, -70, 0.9);
+    // When painted art is present, omit the heavy near/mid procedural bands
+    // that drew nonfunctional zigzag spike silhouettes over the environment.
+    if (hasArt) {
+      push(`far_${env.id}`, viewH - 500, 420, 0.1, -90, 0.25);
+    } else {
+      push(`far_${env.id}`, viewH - 500, 420, 0.14, -90, 0.7);
+      push(`mid_${env.id}`, viewH - 500, 480, 0.3, -80, 0.8);
+      push(`near_${env.id}`, viewH - 300, 320, 0.58, -70, 0.9);
+    }
 
     if (!reduced) this.ambient(viewW, viewH);
     if (env.storm) this.storm(viewW, viewH);
@@ -247,28 +253,28 @@ export class Backdrop {
     const nextKey = this.stages[targetIndex].key;
     EventBus.emit(GAME_EVENTS.STAGE_ANNOUNCED, this.stages[targetIndex].label);
     const sky = this.sky;
+    if (!sky || !sky.active) return;
 
     this.crossfading = true;
+    const overlay = this.scene.add
+      .image(0, 0, nextKey)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(-99)
+      .setAlpha(0);
+    overlay.setDisplaySize(this.viewW, this.viewH);
+
     this.scene.tweens.add({
-      targets: sky,
-      alpha: 0,
-      duration: 420,
-      ease: 'Sine.easeIn',
+      targets: overlay,
+      alpha: 1,
+      duration: 600,
+      ease: 'Sine.easeInOut',
       onComplete: () => {
-        if (!sky.active) {
-          this.crossfading = false;
-          return;
+        if (sky.active) {
+          sky.setTexture(nextKey);
         }
-        sky.setTexture(nextKey).setDisplaySize(this.viewW, this.viewH);
-        this.scene.tweens.add({
-          targets: sky,
-          alpha: 1,
-          duration: 420,
-          ease: 'Sine.easeOut',
-          onComplete: () => {
-            this.crossfading = false;
-          },
-        });
+        overlay.destroy();
+        this.crossfading = false;
       },
     });
   }

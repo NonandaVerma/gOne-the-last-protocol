@@ -5,6 +5,8 @@ import { Flame, Pause, Shield, Sparkles, Wind, Zap } from 'lucide-react';
 import { EventBus, GAME_EVENTS } from '../../game/systems/EventBus';
 import { ActiveRelicState } from '../../game/types/game';
 import { SeamSigil } from '../ui/Seam';
+import { TutorialPanel } from './TutorialPanel';
+import { NarrationOverlay } from './NarrationOverlay';
 
 interface CooldownInfo {
   current: number;
@@ -84,10 +86,11 @@ const AbilityCell: React.FC<{
 export const GameHUD: React.FC = () => {
   const [playerHealth, setPlayerHealth] = useState({ current: 3, max: 3 });
   const [bossHealth, setBossHealth] = useState({ current: 8, max: 8 });
+  const [bossActive, setBossActive] = useState(false);
   const [levelInfo, setLevelInfo] = useState({
     level: 1,
-    name: 'THE INFERNAL ARENA',
-    subtitle: 'Chapter I',
+    name: 'SHATTERED SKIES',
+    subtitle: 'Realm I — The First Fracture',
   });
   const [overdrive, setOverdrive] = useState({ charge: 0, isActive: false });
   const [activeRelics, setActiveRelics] = useState<ActiveRelicState[]>([]);
@@ -107,15 +110,29 @@ export const GameHUD: React.FC = () => {
 
   useEffect(() => {
     const handlePlayerHealth = (data: { current: number; max: number }) => setPlayerHealth(data);
-    const handleBossHealth = (data: { current: number; max: number }) => setBossHealth(data);
-    const handleLevelLoaded = (data: { level: number; name: string; subtitle: string }) =>
+    const handleBossHealth = (data: { current: number; max: number }) => {
+      setBossHealth(data);
+      if (data.current < data.max) setBossActive(true);
+    };
+    const handleBossState = (data: { state?: string } | string) => {
+      const s = typeof data === 'string' ? data : data?.state;
+      if (s === 'active' || s === 'telegraph' || s === 'attack' || s === 'recover' || s === 'stagger') {
+        setBossActive(true);
+      } else if (s === 'defeated') {
+        setBossActive(false);
+      }
+    };
+    const handleLevelLoaded = (data: { level: number; name: string; subtitle: string }) => {
       setLevelInfo(data);
+      setBossActive(data.level > 1);
+    };
     const handleOverdrive = (data: { charge: number; isActive: boolean }) => setOverdrive(data);
     const handleCooldowns = (data: any) => setCooldowns(data);
     const handleActiveRelics = (data: ActiveRelicState[]) => setActiveRelics(data);
 
     EventBus.on(GAME_EVENTS.PLAYER_HEALTH_CHANGED, handlePlayerHealth);
     EventBus.on(GAME_EVENTS.BOSS_HEALTH_CHANGED, handleBossHealth);
+    EventBus.on(GAME_EVENTS.BOSS_STATE_CHANGED, handleBossState);
     EventBus.on(GAME_EVENTS.LEVEL_LOADED, handleLevelLoaded);
     EventBus.on(GAME_EVENTS.OVERDRIVE_CHANGED, handleOverdrive);
     EventBus.on(GAME_EVENTS.COOLDOWNS_CHANGED, handleCooldowns);
@@ -124,6 +141,7 @@ export const GameHUD: React.FC = () => {
     return () => {
       EventBus.off(GAME_EVENTS.PLAYER_HEALTH_CHANGED, handlePlayerHealth);
       EventBus.off(GAME_EVENTS.BOSS_HEALTH_CHANGED, handleBossHealth);
+      EventBus.off(GAME_EVENTS.BOSS_STATE_CHANGED, handleBossState);
       EventBus.off(GAME_EVENTS.LEVEL_LOADED, handleLevelLoaded);
       EventBus.off(GAME_EVENTS.OVERDRIVE_CHANGED, handleOverdrive);
       EventBus.off(GAME_EVENTS.COOLDOWNS_CHANGED, handleCooldowns);
@@ -235,8 +253,12 @@ export const GameHUD: React.FC = () => {
           </button>
         </div>
 
-        {/* ---- ENTROPY: Ra-One ---- */}
-        <div className="panel panel-entropy p-3 min-w-[220px] max-w-[280px] flex flex-col gap-2">
+        {/* ---- ENTROPY: Ra-One (shown when boss is active/engaged) ---- */}
+        <div
+          className={`panel panel-entropy p-3 min-w-[220px] max-w-[280px] flex flex-col gap-2 transition-all duration-500 ${
+            bossActive ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'
+          }`}
+        >
           <div className="flex items-center justify-between gap-3">
             <span className="font-ui text-[0.68rem] font-bold tabular-nums text-steel">
               {bossHealth.current}/{bossHealth.max}
@@ -258,6 +280,12 @@ export const GameHUD: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ================= UPPER-LEFT TUTORIAL PANEL ================= */}
+      <TutorialPanel />
+
+      {/* ================= LOWER NARRATION & SUBTITLES ================= */}
+      <NarrationOverlay />
 
       {/* ================= ABILITY RAIL ================= */}
       <div className="w-full flex justify-center items-end gap-2 flex-wrap pb-1">

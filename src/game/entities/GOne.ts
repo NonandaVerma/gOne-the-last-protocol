@@ -205,6 +205,23 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
     this.jumpHeld = false;
   }
 
+  /**
+   * Called by kinetic launch pads to propel G-One vertically.
+   * Resets air jumps so the player has full aerial control at the apex.
+   */
+  public launchUpward(velocityY = -1180) {
+    if (this.isDead) return;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (body) {
+      body.setVelocityY(velocityY);
+      this.airJumpsUsed = 0;
+      this.lastGroundedAt = -9999;
+      this.jumpBufferedAt = -9999;
+    }
+    AudioManager.getInstance().playJump();
+    this.juice.impact(this.x, body ? body.bottom : this.y, 'player', { scale: 1.2, sparks: 14 });
+  }
+
   // =========================================================================
   // Geometry helpers
   // =========================================================================

@@ -56,17 +56,26 @@ export class DynamicPlatformManager {
     const tileH = (tex as { height?: number }).height || 80;
 
     specs.forEach((spec) => {
-      const sprite = this.scene.physics.add.sprite(spec.x, spec.y + tileH * 0.3 * 0.65, textureKey);
-      sprite.setScale(spec.width / tileW, 0.65);
+      const isLaunch = spec.behaviour === 'launch';
+      const actualKey = isLaunch && scene.textures.exists('launch_pad') ? 'launch_pad' : textureKey;
+      const isCustomKey = actualKey !== textureKey;
+      const curTex = isCustomKey ? scene.textures.get(actualKey).getSourceImage() : tex;
+      const curW = (curTex as { width?: number }).width || 256;
+      const curH = (curTex as { height?: number }).height || 80;
+
+      const sprite = this.scene.physics.add.sprite(
+        spec.x,
+        spec.y + (isLaunch ? curH * 0.5 : tileH * 0.3 * 0.65),
+        actualKey
+      );
+      sprite.setScale(isLaunch ? 1 : spec.width / curW, isLaunch ? 1 : 0.65);
       sprite.setDepth(9);
 
       const body = sprite.body as Phaser.Physics.Arcade.Body;
       body.setAllowGravity(false);
       body.setImmovable(true);
       body.pushable = false;
-      // The collision box is the platform's own footprint — never wider than
-      // what is drawn, so a visually-missed edge is a genuinely missed edge.
-      body.setSize(tileW, tileH * 0.65, true);
+      body.setSize(isLaunch ? curW : curW, isLaunch ? curH : tileH * 0.65, true);
 
       this.group.add(sprite);
 
@@ -107,10 +116,13 @@ export class DynamicPlatformManager {
         m.sprite.setTint(0xcfe8ff);
         break;
       case 'collapsing':
-        m.sprite.setTint(0xffb5a0);
+        m.sprite.setTint(0xffd0a0);
         break;
       case 'phasing':
         m.sprite.setTint(0x9fe8ff);
+        break;
+      case 'launch':
+        m.sprite.clearTint();
         break;
       default:
         break;
@@ -140,49 +152,86 @@ export class DynamicPlatformManager {
   }
 
   /** Called by the scene when the player lands on a platform. */
-  public notifyLanded(platform: Phaser.GameObjects.GameObject) {
+  public notifyLanded(platform: Phaser.GameObjects.GameObject, playerSprite?: Phaser.GameObjects.GameObject) {
     const m = this.items.find((i) => i.sprite === platform);
-    if (!m || m.spec.behaviour !== 'collapsing' || m.triggered || !this.alive) return;
+    if (!m || !this.alive) return;
+
+    // --- LAUNCH PAD BEHAVIOUR ---
+    if (m.spec.behaviour === 'launch' && playerSprite) {
+      const pBody = (playerSprite as unknown as { body?: Phaser.Physics.Arcade.Body }).body;
+      if (pBody) {
+        const velY = m.spec.launchVelocityY ?? -1180;
+        pBody.setVelocityY(velY);
+        AudioManager.getInstance().playDash();
+        this.juice.impact(m.sprite.x, m.sprite.y - 10, 'player', { scale: 0.8, sparks: 12, ring: true });
+        this.scene.tweens.add({
+          targets: m.sprite,
+          scaleY: 0.6,
+          duration: 90,
+          yoyo: true,
+        });
+      }
+      return;
+    }
+
+    // --- 5-STATE COLLAPSING PLATFORM ---
+    // States: 1. STABLE -> 2. WARNING -> 3. SHAKING -> 4. COLLAPSING -> 5. DESTROYED/RESPAWN
+    if (m.spec.behaviour !== 'collapsing' || m.triggered) return;
     m.triggered = true;
 
-    // Tell: shudder + warm crack tint, well before the drop.
-    this.scene.tweens.add({
-      targets: m.sprite,
-      x: m.sprite.x + 3,
-      duration: 55,
-      yoyo: true,
-      repeat: Math.floor(COLLAPSE_WARN_MS / 110),
-      ease: 'Sine.easeInOut',
-    });
-    m.sprite.setTint(0xff6678);
+    // State 2: WARNING (Cracks glow amber, warning sound)
+    m.sprite.setTint(0xffaa44);
+    this.juice.impact(m.sprite.x, m.sprite.y, 'neutral', { scale: 0.4, sparks: 4 });
 
+    // Transition to State 3: SHAKING after 200ms
     this.track(
-      this.scene.time.delayedCall(COLLAPSE_WARN_MS, () => {
+      this.scene.time.delayedCall(200, () => {
         if (!this.alive || !m.sprite.active) return;
-        this.collapse(m);
+        m.sprite.setTint(0xff3344);
+
+        // State 3: Violent Shudder / Shake for 450ms
+        this.scene.tweens.add({
+          targets: m.sprite,
+          x: m.sprite.x + 4,
+          duration: 45,
+          yoyo: true,
+          repeat: 9,
+          ease: 'Sine.easeInOut',
+        });
+
+        // Transition to State 4: COLLAPSING after shake completes
+        this.track(
+          this.scene.time.delayedCall(450, () => {
+            if (!this.alive || !m.sprite.active) return;
+            this.collapse(m);
+          })
+        );
       })
     );
   }
 
   private collapse(m: Managed) {
+    // State 4: COLLAPSING
     const body = m.sprite.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
     m.solid = false;
     AudioManager.getInstance().playExplosion();
-    this.juice.dust(m.sprite.x, m.sprite.y, 6, 0x7a5a48);
+    this.juice.dust(m.sprite.x, m.sprite.y, 8, 0x7a5a48);
 
     const homeY = m.sprite.y;
-    if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0, duration: 300 });
+    if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0, duration: 250 });
+
     this.scene.tweens.add({
       targets: m.sprite,
-      y: homeY + 260,
+      y: homeY + 280,
       alpha: 0,
-      angle: Phaser.Math.Between(-12, 12),
-      duration: 620,
+      angle: Phaser.Math.Between(-14, 14),
+      duration: 520,
       ease: 'Quad.easeIn',
       onComplete: () => {
         if (!this.alive || !m.sprite.active) return;
-        // Restore so a retry of the section is possible without a full restart.
+
+        // State 5: DESTROYED (invisible) -> RESTORED after delay
         this.track(
           this.scene.time.delayedCall(COLLAPSE_RESPAWN_MS, () => {
             if (!this.alive || !m.sprite.active) return;
@@ -192,8 +241,11 @@ export class DynamicPlatformManager {
             this.tint(m);
             body.enable = true;
             body.updateFromGameObject();
-            this.scene.tweens.add({ targets: m.sprite, alpha: 1, duration: 240 });
-            if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0.5, duration: 240 });
+
+            // Harmonic energy restoration flash
+            this.juice.impact(m.sprite.x, homeY, 'player', { scale: 0.6, sparks: 8 });
+            this.scene.tweens.add({ targets: m.sprite, alpha: 1, duration: 260 });
+            if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0.5, duration: 260 });
           })
         );
       },

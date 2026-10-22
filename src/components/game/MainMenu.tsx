@@ -62,12 +62,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
   }, []);
 
   /** Charge the dimensional seam, then hand off to the existing Phaser flow. */
-  const proceedToGame = useCallback((level: number) => {
+  const proceedToGame = useCallback((level: number, immediate = false) => {
     const reduced =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    if (reduced) {
+    if (reduced || immediate) {
       EventBus.emit(GAME_EVENTS.START_GAME, { level });
       return;
     }
@@ -75,7 +75,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     setCharge(1);
     window.setTimeout(() => {
       EventBus.emit(GAME_EVENTS.START_GAME, { level });
-    }, 620);
+    }, 550);
   }, []);
 
   /**
@@ -103,7 +103,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
   const handleRevealFinish = useCallback(() => {
     const level = revealLevel ?? 1;
     setRevealLevel(null);
-    proceedToGame(level);
+    proceedToGame(level, true);
   }, [revealLevel, proceedToGame]);
 
   /* "PRESS ANY KEY TO BEGIN" — honour the promise printed in the key art. */
@@ -200,10 +200,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
           transient start-transition flare. */}
       {charge > 0 && <VerticalSeam intensity={charge} animate={false} />}
 
-      {/* White-out at the peak of the transition */}
+      {/* Dark dissolve transition — eliminates the white flash completely */}
       <div
-        className="absolute inset-0 bg-white pointer-events-none z-40 transition-opacity duration-500"
-        style={{ opacity: charge * 0.85 }}
+        className="absolute inset-0 bg-obsidian pointer-events-none z-40 transition-opacity duration-500"
+        style={{ opacity: charge }}
         aria-hidden="true"
       />
 

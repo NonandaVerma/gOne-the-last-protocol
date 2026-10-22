@@ -43,97 +43,177 @@ const MAX_DOUBLE = 640;
 export const LEVELS: Record<number, LevelConfig> = {
   /* =========================================================================
      I — SHATTERED SKIES
-     Teaches movement, jumping and the first relic. Generous throughout.
+     5-Stage Progression: Awakening -> Sky Sentinels -> Shattered Bridge ->
+     Corrupted Guardian -> Protocol Fragment Sanctuary.
      ========================================================================= */
   1: {
     id: 1,
     name: 'SHATTERED SKIES',
     subtitle: 'Realm I — The First Fracture',
-    objective: 'Cross the fracturing sky-fortress and confront the anomaly.',
+    objective: 'Restore the power conduits, cross the fractured skyways, and secure Protocol Fragment I.',
     playerHealth: 4,
-    bossHealth: 6,
+    bossHealth: 7,
     gravity: 1750,
     openingTaunt: '"You were designed to protect. I was designed to end."',
     environment: REALMS[1],
-    difficulty: { bossTempoScale: 1.35, hazardWarnScale: 1.6, relicSpawnSeconds: 9 },
+    difficulty: { bossTempoScale: 1.1, hazardWarnScale: 1.5, relicSpawnSeconds: 10 },
     arena: {
-      worldWidth: 3400,
+      worldWidth: 6400,
       groundTop: GROUND_TOP,
-      playerSpawnX: 190,
-      bossSpawnX: 2880,
-      arenaStartX: 1860,
+      playerSpawnX: 180,
+      bossSpawnX: 4700,
+      arenaStartX: 3900,
       hasLava: false,
-      // Long flat run-up (Stage 1), then a rising vertical section (Stage 2),
-      // then the bridge proper (Stage 3), then the arena (Stage 4).
+
+      // Distinct physical environments across all 5 stages:
       platforms: [
-        { x: 760, y: 540, width: 320 },
-        // Stage 2 "Sky Sentinels" — a vertical energy lift the player can
-        // ride up to an elevated optional platform. The MANDATORY route is
-        // still the ground-level path below, so missing or skipping the lift
-        // never blocks progress; it's a reachable bonus, not a gate.
+        // ---- STAGE 1: AWAKENING (x: 0 - 1300) ----
+        // Industrial machinery block (teaches A/D and jumping over low obstacles)
+        { x: 380, y: 570, width: 140 },
+        // Mid walkway over drainage gap
+        { x: 920, y: 550, width: 180 },
+
+        // ---- STAGE 2: SKY SENTINELS (x: 1300 - 2600) ----
+        // Vertical moving lift elevating player from ground up to gantry
         {
-          x: 980,
-          y: 420,
-          width: 140,
+          x: 1560,
+          y: 520,
+          width: 160,
           behaviour: 'moving',
           travelY: -160,
-          travelMs: 2600,
+          travelMs: 2200,
         },
-        { x: 1180, y: 506, width: 300 },
-        // Stage 3 "The Shattered Bridge" — the span itself collapses once
-        // stood on. The 1660 platform (unchanged height/reach from before)
-        // remains as the fallback route for a player who doesn't trust it.
-        { x: 1420, y: 474, width: 220, behaviour: 'collapsing' },
-        { x: 1660, y: 474, width: 220 },
-        // Arena (Stage 4 — the boss floor itself)
-        { x: 2180, y: 498, width: 300 },
-        { x: 2620, y: 440, width: 340 },
-        { x: 3060, y: 498, width: 300 },
+        // Lower gantry platform
+        { x: 1840, y: 360, width: 280 },
+        // Kinetic Launch Pad on the gantry (shoots G-One to upper observation deck)
+        {
+          x: 1840,
+          y: 334,
+          width: 64,
+          behaviour: 'launch',
+          launchVelocityY: -1180,
+        },
+        // High observation catwalk (reward & sentinel combat)
+        { x: 2120, y: 190, width: 340 },
+        // Descending approach gantry leading toward the bridge
+        { x: 2420, y: 440, width: 240 },
+
+        // ---- STAGE 3: THE SHATTERED BRIDGE (x: 2600 - 3900) ----
+        // Bridge western abutment
+        { x: 2680, y: 520, width: 240 },
+        // 5-state collapsing span sections & stable piers across the sky chasm
+        { x: 2940, y: 500, width: 190, behaviour: 'collapsing' },
+        { x: 3170, y: 470, width: 150 }, // Stable central pier
+        { x: 3400, y: 460, width: 190, behaviour: 'collapsing' },
+        { x: 3640, y: 490, width: 190, behaviour: 'collapsing' },
+        // Bridge eastern abutment
+        { x: 3860, y: 520, width: 220 },
+
+        // ---- STAGE 4: THE CORRUPTED GUARDIAN (x: 3900 - 5200) ----
+        // Dedicated combat arena with 2 high-ground tactical dodging platforms
+        { x: 4260, y: 460, width: 280 },
+        { x: 4860, y: 460, width: 280 },
+
+        // ---- STAGE 5: PROTOCOL FRAGMENT SANCTUARY (x: 5200 - 6400) ----
+        // Celestial entrance platform & altar steps
+        { x: 5460, y: 540, width: 260 },
+        { x: 6050, y: 580, width: 240 },
       ],
-      // One 220px pit — a single forgiving jump, well inside the 408 budget.
-      gaps: [[900, 1120]],
+
+      // Physical chasm gaps:
+      gaps: [
+        [810, 1030],   // Stage 1 drainage gap (220px, inside 408 single jump reach)
+        [2800, 3760],  // Stage 3 Shattered Bridge chasm (spanned by collapsing platforms)
+      ],
+
       staticHazards: [
-        // Stage 1 "Awakening" power-failure beat: crossing x=250 arms a
-        // klaxon warning, then the gate seals at x=550. ~300px of run-up at
-        // maxSpeed (430px/s, ~0.7s) against a 1.6s warn+close budget — easy
-        // to clear at a dead sprint, reads as tense rather than being a real
-        // execution check, matching Realm 1's deliberately forgiving curve.
-        { kind: 'security_door', x: 550, y: GROUND_TOP, width: 40, height: 220, triggerX: 250, warnMs: 900, closeMs: 700, holdMs: 2500 },
-        // Stage 3: spikes and the gate sit BEFORE the collapsing platform's
-        // footprint (1310-1530), not beneath it — spikes never telegraph, so
-        // a mistimed collapse dropping the player onto them would be an
-        // unreadable hit. This way the ground route's danger is resolved
-        // before the player ever commits to the elevated crossing.
-        { kind: 'spikes', x: 1250, y: GROUND_TOP, width: 100 },
-        { kind: 'laser_gate', x: 1300, y: GROUND_TOP, width: 14, height: 240, warnMs: 700, activeMs: 850, cooldownMs: 1300, offsetMs: 0 },
+        // STAGE 1: Interactive Power Relay Console (opens security blast door)
+        {
+          kind: 'terminal',
+          x: 640,
+          y: GROUND_TOP,
+          width: 48,
+          label: 'POWER_RELAY',
+          prompt: '[E] ACTIVATE POWER CONDUIT',
+          eventKey: 'power-relay-activated',
+        },
+        // STAGE 1: Security blast door at facility perimeter
+        {
+          kind: 'security_door',
+          x: 1200,
+          y: GROUND_TOP,
+          width: 44,
+          height: 220,
+          triggerX: 200,
+          warnMs: 1200,
+          closeMs: 700,
+          holdMs: 3000,
+        },
+
+        // STAGE 3: Clear, well-telegraphed laser gate before the bridge chasm
+        {
+          kind: 'laser_gate',
+          x: 2560,
+          y: GROUND_TOP,
+          width: 14,
+          height: 220,
+          warnMs: 900,
+          activeMs: 800,
+          cooldownMs: 1500,
+        },
+
+        // STAGE 4: Guardian Arena Entry & Exit Blast Gates
+        {
+          kind: 'locked_gate',
+          x: 5180,
+          y: GROUND_TOP,
+          width: 40,
+          height: 240,
+          guardGroup: 'guardian_gate',
+        },
+
+        // STAGE 5: Protocol Terminal Console (initializes altar energy)
+        {
+          kind: 'terminal',
+          x: 5680,
+          y: GROUND_TOP,
+          width: 48,
+          label: 'PROTOCOL_CONDUIT',
+          prompt: '[E] INITIALIZE PROTOCOL CONDUIT',
+          eventKey: 'protocol-conduit-activated',
+        },
       ],
+
       pickups: [
-        // Reward for taking the Stage 2 lift rather than walking past it.
-        { x: 980, y: 356, type: 'overdrive_shard' },
-        { x: 1180, y: 440, type: 'phoenix_core' },
-        { x: 1660, y: 410, type: 'aegis_olympus' },
+        { x: 920, y: 480, type: 'phoenix_core' },
+        // High observation reward in Stage 2 for taking the launch pad
+        { x: 2120, y: 130, type: 'overdrive_shard' },
+        // Mid-bridge reward in Stage 3 for precision traversal
+        { x: 3170, y: 400, type: 'aegis_olympus' },
+        // Combat arena preparation relic
+        { x: 4260, y: 390, type: 'thunderheart' },
       ],
-      // Corruption's first foothold in an otherwise untouched realm — two
-      // grunts on the wide run-up (room to practice Pulse Shot or just dash
-      // past), a third on the first platform, a Seeker stationed on the
-      // elevated Stage 2 lift platform (forces aerial engagement while
-      // riding the lift), and one more guarding the approach to the gate.
+
       enemies: [
-        { kind: 'drone', x: 540, y: GROUND_TOP - 60, patrolMin: 440, patrolMax: 680 },
-        { kind: 'drone', x: 1180, y: 440, patrolMin: 1040, patrolMax: 1320 },
-        { kind: 'seeker', x: 980, y: 300 },
-        { kind: 'seeker', x: 1680, y: GROUND_TOP - 170 },
+        // Stage 1: Recon drone to teach Pulse Shot
+        { kind: 'drone', x: 740, y: GROUND_TOP - 60, patrolMin: 680, patrolMax: 800 },
+        // Stage 2: Sentinel sky drones and seeker forcing shield & aerial engagement
+        { kind: 'seeker', x: 1720, y: 260 },
+        { kind: 'drone', x: 2120, y: 130, patrolMin: 2020, patrolMax: 2220 },
+        { kind: 'seeker', x: 2360, y: 320 },
+        // Stage 3: Sentinel guarding the bridge approach
+        { kind: 'drone', x: 2680, y: 460, patrolMin: 2600, patrolMax: 2760 },
       ],
     },
     bossMechanics: {
       canFly: false,
-      hasSpread: false,
+      hasSpread: true,
       hasCharged: true,
       hasHazards: false,
       hasBeams: false,
       canTeleport: false,
-      attackIntervalMin: 1500,
-      attackIntervalMax: 2100,
+      attackIntervalMin: 1800,
+      attackIntervalMax: 2400,
       projectileSpeedScale: 0.85,
     },
   },

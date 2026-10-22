@@ -29,14 +29,12 @@ export const REALMS: Record<number, RealmEnvironment> = {
   1: {
     id: 1,
     backdrop: 'bg_realm1',
-    // Realm 1's internal five-stage progression. Stage 5 (Protocol Fragment)
-    // has no traversal geometry yet — its art is used for the post-boss
-    // transition card instead (see ArenaScene.showLevelTransition).
     stageBackdrops: [
       { fromX: 0, key: 'bg_realm1', label: 'Stage I — Awakening' },
-      { fromX: 760, key: 'bg_realm1_stage2', label: 'Stage II — Sky Sentinels' },
-      { fromX: 1180, key: 'bg_realm1_stage3', label: 'Stage III — The Shattered Bridge' },
-      { fromX: 1860, key: 'bg_realm1_stage4', label: 'Stage IV — The Corrupted Guardian' },
+      { fromX: 1300, key: 'bg_realm1_stage2', label: 'Stage II — Sky Sentinels' },
+      { fromX: 2600, key: 'bg_realm1_stage3', label: 'Stage III — The Shattered Bridge' },
+      { fromX: 3900, key: 'bg_realm1_stage4', label: 'Stage IV — The Corrupted Guardian' },
+      { fromX: 5200, key: 'bg_realm1_stage5', label: 'Stage V — Protocol Fragment' },
     ],
     skyTop: 0x0a2a4d,
     skyMid: 0x1d5f91,
