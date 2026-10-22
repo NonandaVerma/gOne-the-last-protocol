@@ -256,20 +256,33 @@ function layerTextures(scene: Phaser.Scene, env: RealmEnvironment) {
    Platform material
    --------------------------------------------------------------------------- */
 
+/**
+ * Platform material.
+ *
+ * Reads as a broken fragment of floating architecture — matching the painted
+ * key art's ruined-bridge language — rather than a solid colour bar. The
+ * silhouette only gets ragged in the LOWER portion of the frame (below
+ * `solidBottom`); the collision body is the full texture rectangle regardless
+ * of what's drawn transparent (Arcade's `refreshBody()` syncs to display size,
+ * not pixel content), so none of this touches gameplay geometry. The lit top
+ * lip — the actual landing surface — is untouched from the previous version.
+ */
 function platformTexture(scene: Phaser.Scene, env: RealmEnvironment) {
   const W = 256;
   const H = 80;
+  /** Below this Y the silhouette breaks apart into hanging fragments. */
+  const solidBottom = 54;
 
   forge(scene, `platform_l${env.id}`, W, H, (g) => {
     const r = seeded(env.id * 7919);
 
-    // Body, darkening downward.
-    bandRect(g, 0, 0, W, H, env.platformBody, env.platformDeep, 20);
+    // Solid mass — darkening downward, stops short of the full frame height.
+    bandRect(g, 0, 0, W, solidBottom, env.platformBody, env.platformDeep, 20);
 
-    // Fractured rock/structure detail in the face.
-    for (let i = 0; i < 16; i++) {
+    // Fractured rock/structure detail in the solid face only.
+    for (let i = 0; i < 12; i++) {
       const x = r() * W;
-      const y = 18 + r() * (H - 26);
+      const y = 18 + r() * (solidBottom - 26);
       poly(
         g,
         [
@@ -282,12 +295,69 @@ function platformTexture(scene: Phaser.Scene, env: RealmEnvironment) {
       );
     }
 
+    /* Broken underside: jagged, partial-coverage chunks hanging below the
+       solid mass with gaps between them, so sky/backdrop shows through —
+       the "ruined fragment" silhouette instead of a clean rectangle. */
+    let x = 6;
+    while (x < W - 10) {
+      const chunkW = rand(r, 22, 46);
+      if (r() > 0.3) {
+        const drop = rand(r, 10, 24);
+        poly(
+          g,
+          [
+            { x, y: solidBottom - 4 },
+            { x: x + chunkW * 0.3, y: solidBottom + drop },
+            { x: x + chunkW * 0.7, y: solidBottom + drop * 0.7 },
+            { x: x + chunkW, y: solidBottom - 4 },
+          ],
+          mix(env.platformDeep, 0x000000, 0.2),
+          0.9
+        );
+      }
+      x += chunkW + rand(r, 8, 20);
+    }
+
+    // Thin structural struts hanging from the mass — reinforces "fragment of
+    // a larger structure" rather than a complete, self-contained object.
+    for (let i = 0; i < 3; i++) {
+      const sx = (W / 4) * (i + 0.6) + rand(r, -14, 14);
+      const len = rand(r, 14, 24);
+      path(
+        g,
+        [{ x: sx, y: solidBottom - 6 }, { x: sx + rand(r, -4, 4), y: solidBottom + len }],
+        env.platformDeep,
+        0.8,
+        2.4
+      );
+      g.fillStyle(mix(env.platformDeep, 0x000000, 0.3), 0.9);
+      g.fillCircle(sx, solidBottom + len, 2.4);
+    }
+
+    // One dangling cable with a glowing junction node — the single accent
+    // tying the platform's lighting to the realm's energy colour.
+    const cableX = W * (0.25 + r() * 0.5);
+    const cableLen = rand(r, 18, 30);
+    path(
+      g,
+      [
+        { x: cableX, y: solidBottom - 2 },
+        { x: cableX + rand(r, -8, 8), y: solidBottom + cableLen * 0.6 },
+        { x: cableX + rand(r, -6, 6), y: solidBottom + cableLen },
+      ],
+      0x0a0a0a,
+      0.85,
+      1.6
+    );
+    g.fillStyle(corrupt(env.platformEnergy, env.corruption, 0.5), 1);
+    g.fillCircle(cableX + rand(r, -6, 6), solidBottom + cableLen, 2.2);
+
     // Energy seams — periodic so horizontally tiled copies line up seamlessly.
     const seamColor = corrupt(env.platformEnergy, env.corruption, 0.6);
     for (let v = 0; v < 2; v++) {
       const pts: Vec[] = [];
-      for (let x = 0; x <= W; x += 16) {
-        pts.push({ x, y: 30 + v * 20 + Math.sin((x / W) * Math.PI * 2 * (v + 1)) * 6 });
+      for (let px = 0; px <= W; px += 16) {
+        pts.push({ x: px, y: 28 + v * 16 + Math.sin((px / W) * Math.PI * 2 * (v + 1)) * 5 });
       }
       path(g, pts, seamColor, 0.6, 3);
       path(g, pts, 0xffffff, 0.5, 1);
@@ -295,7 +365,7 @@ function platformTexture(scene: Phaser.Scene, env: RealmEnvironment) {
 
     /* The lit top lip is drawn LAST and kept high-contrast: this is the edge
        the player actually lands on, so it must never be ambiguous against
-       decorative side detail. */
+       decorative side detail. Unchanged from the previous version. */
     bandRect(g, 0, 0, W, 13, env.platformTop, mix(env.platformTop, env.platformBody, 0.8), 8);
     path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], mix(env.platformTop, 0xffffff, 0.5), 0.85, 2);
     path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], env.platformDeep, 0.6, 1.5);

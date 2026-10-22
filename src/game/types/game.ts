@@ -124,6 +124,22 @@ export interface PickupSpec {
   type: RelicType;
 }
 
+/** Grunt enemies populating a realm's traversal approach. */
+export type EnemyKind =
+  /** Ground-bound melee lunger. */
+  | 'drone'
+  /** Hovering ranged attacker that keeps its distance. */
+  | 'seeker';
+
+export interface EnemySpec {
+  kind: EnemyKind;
+  x: number;
+  y: number;
+  /** `drone` only: patrol bounds: it won't chase past these world X values. */
+  patrolMin?: number;
+  patrolMax?: number;
+}
+
 export interface ArenaGeometry {
   /** Total scrollable arena width; the camera is clamped to this. */
   worldWidth: number;
@@ -148,6 +164,8 @@ export interface ArenaGeometry {
   pickups?: PickupSpec[];
   /** Pits in the ground: [startX, endX] pairs. Falling in costs a unit. */
   gaps?: Array<[number, number]>;
+  /** Grunt enemies placed along the approach. */
+  enemies?: EnemySpec[];
 }
 
 export interface BossMechanics {
@@ -185,6 +203,15 @@ export interface RealmEnvironment {
   id: LevelId;
   /** Painted key-art backdrop under the parallax layers. */
   backdrop: string;
+  /**
+   * Internal narrative sub-stages within this realm, each with its own
+   * painted backdrop. `Backdrop` crossfades to the last entry whose `fromX`
+   * is at or before the camera's current centre, so the world visibly
+   * advances through the realm's story beats as the player traverses it.
+   * The first entry should have `fromX: 0`. Omit for a realm with a single
+   * backdrop (the default `backdrop` field above is used instead).
+   */
+  stageBackdrops?: Array<{ fromX: number; key: string; label: string }>;
 
   /* Sky gradient, top to horizon */
   skyTop: number;

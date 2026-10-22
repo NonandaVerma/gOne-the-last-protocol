@@ -13,6 +13,7 @@ import {
   forgeSheet,
   seeded,
   bolt,
+  rand,
   Rng,
 } from './draw';
 import { Pose, Proportions, solve, armouredLimb, boot, fist, torsoShell, across } from './rig';
@@ -58,6 +59,46 @@ function basis(a: number) {
 function at(c: Vec, a: number, forward: number, upward: number): Vec {
   const b = basis(a);
   return { x: c.x + b.f.x * forward + b.u.x * upward, y: c.y + b.f.y * forward + b.u.y * upward };
+}
+
+/**
+ * The tattered crimson-black cape from the key art — torn into ragged
+ * strips rather than one smooth sheet, distinguishing it in silhouette alone
+ * from G-One's flowing cape. Anchored at the back shoulder, drawn first so
+ * the torso and back arm overlap its leading edge.
+ */
+function tatteredCape(g: Gfx, sk: ReturnType<typeof solve>, a: number, r: Rng) {
+  const sway = Math.sin(a * 4) * 10;
+  const top = at(sk.shoulderBack, a, 6, 24);
+  const topBack = at(sk.shoulderBack, a, -10, 18);
+  const mid = at(sk.pelvis, a, -22 + sway * 0.4, 0);
+  const midBack = at(sk.pelvis, a, -44 + sway * 0.7, -18);
+
+  // Base cloth mass behind the torn strips.
+  poly(g, [top, topBack, midBack, mid], mix(VILLAIN.shadow, 0x000000, 0.3), 0.9);
+
+  // Ragged torn strips hanging from the back edge — each a different length
+  // so the hem reads as damaged rather than a clean fringe.
+  const strips = 4;
+  for (let i = 0; i < strips; i++) {
+    const t = i / (strips - 1);
+    const base = {
+      x: midBack.x + (mid.x - midBack.x) * t * 0.35,
+      y: midBack.y + (mid.y - midBack.y) * t * 0.35,
+    };
+    const len = rand(r, 30, 56);
+    const tip = at(base, a, -len * 0.35 + rand(r, -6, 6), -len);
+    const notch = at(base, a, -len * 0.15, -len * 0.55);
+    poly(
+      g,
+      [base, notch, tip, { x: base.x - 6, y: base.y + 4 }],
+      mix(VILLAIN.shadow, 0x000000, 0.2 + t * 0.15),
+      0.88
+    );
+  }
+
+  // Crimson piping along the collar edge only — the torn strips stay dark.
+  path(g, [top, topBack], VILLAIN.energy, 0.5, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +269,9 @@ export function drawRaOne(g: Gfx, pose: Pose, phase = 1) {
 
   // Dark aura swelling with the boss phase.
   bloom(g, sk.chest.x, sk.chest.y, 92 * (0.8 + phase * 0.25), VILLAIN.energy, 0.1 + phase * 0.07, 7);
+
+  // Cape first: furthest-back element, so the body overlaps its leading edge.
+  tatteredCape(g, sk, a, r);
 
   // --- BACK LAYER -----------------------------------------------------------
   armouredLimb(g, sk.shoulderBack, sk.elbowBack, P.upperArmW[0], P.upperArmW[1], VILLAIN, { depth: 0.85 });

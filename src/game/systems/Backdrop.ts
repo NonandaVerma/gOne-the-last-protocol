@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { RealmEnvironment, AmbientKind } from '../types/game';
 import { REALMS } from '../data/realms';
 import { SaveManager } from './SaveManager';
+import { EventBus, GAME_EVENTS } from './EventBus';
 
 interface Layer {
   sprite: Phaser.GameObjects.TileSprite;
@@ -75,10 +76,20 @@ export class Backdrop {
   private env: RealmEnvironment;
   private stormTimer?: Phaser.Time.TimerEvent;
 
+  /** Null when this realm has no internal sub-stage progression. */
+  private sky?: Phaser.GameObjects.Image;
+  private viewW = 0;
+  private viewH = 0;
+  private stages?: Array<{ fromX: number; key: string; label: string }>;
+  private activeStageIndex = -1;
+  private crossfading = false;
+
   constructor(scene: Phaser.Scene, level: number, viewW: number, viewH: number) {
     this.scene = scene;
     this.env = REALMS[level] ?? REALMS[1];
     const env = this.env;
+    this.viewW = viewW;
+    this.viewH = viewH;
 
     const reduced = SaveManager.getSettings().reducedMotion;
 
@@ -93,6 +104,19 @@ export class Backdrop {
         .setDepth(-100);
       sky.setDisplaySize(viewW, viewH);
       this.owned.push(sky);
+      this.sky = sky;
+    }
+
+    // --- Internal sub-stage progression (Realm 1 today) --------------------
+    // Keep only the stages whose texture actually loaded, so one missing or
+    // renamed asset degrades to fewer visible stages instead of silently
+    // disabling the whole feature (an `every()` check previously meant a
+    // single 404 reverted the entire realm to one static backdrop).
+    const loadedStages = env.stageBackdrops?.filter((s) => scene.textures.exists(s.key));
+    if (loadedStages && loadedStages.length > 0) {
+      this.stages = [...loadedStages].sort((a, b) => a.fromX - b.fromX);
+      this.activeStageIndex = 0;
+      EventBus.emit(GAME_EVENTS.STAGE_ANNOUNCED, this.stages[0].label);
     }
 
     const push = (key: string, y: number, h: number, factorX: number, depth: number, alpha: number, driftX?: number) => {
@@ -204,10 +228,54 @@ export class Backdrop {
         layer.sprite.setData('drift', d);
       }
     }
+
+    this.updateStage(scrollX);
+  }
+
+  /** Crossfade the painted backdrop as the camera crosses a stage boundary. */
+  private updateStage(scrollX: number) {
+    if (!this.stages || !this.sky || this.crossfading) return;
+
+    const centreX = scrollX + this.viewW / 2;
+    let targetIndex = 0;
+    for (let i = 0; i < this.stages.length; i++) {
+      if (centreX >= this.stages[i].fromX) targetIndex = i;
+    }
+
+    if (targetIndex === this.activeStageIndex) return;
+    this.activeStageIndex = targetIndex;
+    const nextKey = this.stages[targetIndex].key;
+    EventBus.emit(GAME_EVENTS.STAGE_ANNOUNCED, this.stages[targetIndex].label);
+    const sky = this.sky;
+
+    this.crossfading = true;
+    this.scene.tweens.add({
+      targets: sky,
+      alpha: 0,
+      duration: 420,
+      ease: 'Sine.easeIn',
+      onComplete: () => {
+        if (!sky.active) {
+          this.crossfading = false;
+          return;
+        }
+        sky.setTexture(nextKey).setDisplaySize(this.viewW, this.viewH);
+        this.scene.tweens.add({
+          targets: sky,
+          alpha: 1,
+          duration: 420,
+          ease: 'Sine.easeOut',
+          onComplete: () => {
+            this.crossfading = false;
+          },
+        });
+      },
+    });
   }
 
   public destroy() {
     if (this.stormTimer) this.stormTimer.remove(false);
+    if (this.sky) this.scene.tweens.killTweensOf(this.sky);
     this.owned.forEach((o) => {
       if (o && (o as { active?: boolean }).active !== false) o.destroy();
     });

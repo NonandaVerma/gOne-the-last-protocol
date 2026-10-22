@@ -36,9 +36,18 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
   private muzzle: Phaser.GameObjects.Sprite;
   private shield: Phaser.GameObjects.Sprite;
   private aura?: Phaser.GameObjects.Sprite;
+  private shadow?: Phaser.GameObjects.Image;
 
   private aim = { x: 0, y: 0 };
   private moveInput = 0;
+  /**
+   * Last non-zero horizontal move direction. Drives the body's visual
+   * facing (`setFlipX`) — deliberately NOT the same as `facing` below, which
+   * tracks the aim/crosshair side for the cannon's own independent rotation.
+   * Coupling body-flip to aim meant running right while the cursor trailed
+   * behind flipped the whole body backward mid-run.
+   */
+  private lastMoveDir = 1;
   private motion: MotionState = 'idle';
 
   private lastGroundedAt = -9999;
@@ -87,6 +96,13 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
 
     this.setScale(GONE_SCALE);
     this.setDepth(22);
+
+    // Grounds G-One against the painted backdrop rather than reading as a
+    // flat cutout pasted over it. Shown only while standing on something.
+    if (scene.textures.exists('contact_shadow')) {
+      this.shadow = scene.add.image(x, y, 'contact_shadow');
+      this.shadow.setDepth(8).setAlpha(0).setDisplaySize(70, 24);
+    }
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);
@@ -171,6 +187,7 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
 
   public setMoveInput(dir: number) {
     this.moveInput = Phaser.Math.Clamp(dir, -1, 1);
+    if (this.moveInput !== 0) this.lastMoveDir = Math.sign(this.moveInput);
   }
 
   public pressJump() {
@@ -671,6 +688,14 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
 
     const grounded = body.blocked.down || body.touching.down;
 
+    if (this.shadow) {
+      this.shadow.setPosition(this.x, body.bottom + 2);
+      // Fades in when grounded rather than tracking jump height — cheap,
+      // and avoids guessing distance-to-ground with no raycast.
+      const targetAlpha = grounded && !this.isDead ? 0.5 : 0;
+      this.shadow.setAlpha(Phaser.Math.Linear(this.shadow.alpha, targetAlpha, 0.25));
+    }
+
     if (this.isDead) {
       body.setAccelerationX(0);
       this.syncAttachments();
@@ -681,7 +706,10 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
     body.setMaxVelocity(CFG.maxSpeed * speedMult, 2200);
 
     // --- Facing --------------------------------------------------------------
-    this.setFlipX(this.facing < 0);
+    // Body orientation follows movement, not the aim/crosshair — the cannon
+    // rotates to `aimAngle` independently in syncAttachments(), so the body
+    // doesn't need to flip just because the cursor is behind the player.
+    this.setFlipX(this.lastMoveDir < 0);
 
     // --- Horizontal movement -------------------------------------------------
     if (!this.isDashing) {
@@ -792,6 +820,7 @@ export class GOne extends Phaser.Physics.Arcade.Sprite {
     this.muzzle?.destroy();
     this.shield?.destroy();
     this.aura?.destroy();
+    this.shadow?.destroy();
     super.destroy(fromScene);
   }
 }

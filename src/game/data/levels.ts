@@ -82,6 +82,16 @@ export const LEVELS: Record<number, LevelConfig> = {
         { x: 1180, y: 440, type: 'phoenix_core' },
         { x: 1560, y: 410, type: 'aegis_olympus' },
       ],
+      // Corruption's first foothold in an otherwise untouched realm — two
+      // grunts on the wide run-up (room to practice Pulse Shot or just dash
+      // past), a third on the first platform, and one Seeker guarding the
+      // approach to the gate so the player must engage at range at least
+      // once before Realm 2 makes that mandatory.
+      enemies: [
+        { kind: 'drone', x: 540, y: GROUND_TOP - 60, patrolMin: 440, patrolMax: 680 },
+        { kind: 'drone', x: 1180, y: 440, patrolMin: 1040, patrolMax: 1320 },
+        { kind: 'seeker', x: 1680, y: GROUND_TOP - 170 },
+      ],
     },
     bossMechanics: {
       canFly: false,

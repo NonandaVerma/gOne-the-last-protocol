@@ -89,6 +89,8 @@ export const GAME_EVENTS = {
   // Level & story
   LEVEL_LOADED: 'level-loaded',
   STORY_STEP: 'story-step',
+  /** Fired by Backdrop whenever a realm's internal stage backdrop changes. */
+  STAGE_ANNOUNCED: 'stage-announced',
   SCREEN_SHAKE: 'screen-shake',
 
   // Settings

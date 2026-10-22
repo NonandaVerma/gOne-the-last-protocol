@@ -28,14 +28,25 @@ export class PreloadScene extends Phaser.Scene {
     /* Painted backdrop per realm. These reuse existing key art rather than
        inventing asset paths — the filenames differ from the realm names
        because the art predates the six-realm structure. */
-    this.load.image('bg_realm1', '/images/bg_arrival.png');   // sky fortress + fracture
+    this.load.image('bg_realm1', '/images/level1-stage1.png'); // Shattered Skies, stage 1: Awakening
+
+    /* Realm 1's five-stage internal progression (Awakening -> Sky Sentinels ->
+       Shattered Bridge -> Corrupted Guardian -> Protocol Fragment). Stages 1-4
+       are the four backdrops the player actually crosses — Backdrop.ts
+       crossfades between them as the camera moves through the realm's world-X
+       (see STAGE_BACKDROPS in realms.ts). Stage 5 has no separate traversal
+       geometry yet, so its art is used for the post-boss transition card
+       instead of being wired to unbuilt gameplay. */
+    this.load.image('bg_realm1_stage2', '/images/level1-stage2.png'); // Sky Sentinels
+    this.load.image('bg_realm1_stage3', '/images/level1-stage3.png'); // The Shattered Bridge
+    this.load.image('bg_realm1_stage4', '/images/level1-stage4.png'); // The Corrupted Guardian
+    this.load.image('bg_realm1_stage5', '/images/level1-stage5.png'); // Protocol Fragment
+
     this.load.image('bg_realm2', '/images/bg_level1.png');    // Infernal Fortress
     this.load.image('bg_realm3', '/images/bg_defeat.png');    // Vortex Over Floating Ruins
     this.load.image('bg_realm4', '/images/bg_realm4.png');    // Moonlit Citadel of the Frozen Sky
     this.load.image('bg_realm5', '/images/bg_victory.png');   // Celestial Forest Sanctuary
     this.load.image('bg_realm6', '/images/bg_level3.png');    // Crimson Rift: The Final Arena
-
-    this.load.image('bg_arrival', '/images/bg_arrival.png');
 
     this.load.on('progress', (value: number) => {
       progressBar.clear();

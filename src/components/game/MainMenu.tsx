@@ -6,6 +6,7 @@ import {
   Film,
   Maximize2,
   Minimize2,
+  RotateCcw,
   Settings as SettingsIcon,
   Volume2,
   VolumeX,
@@ -18,6 +19,7 @@ import { ProtocolButton } from '../ui/ProtocolButton';
 import { ModalShell } from '../ui/ModalShell';
 import { SeamDivider, SeamSigil, VerticalSeam } from '../ui/Seam';
 import { HowToPlayModal } from './HowToPlayModal';
+import { LevelRevealCinematic, getRealmReveal } from './LevelRevealCinematic';
 
 interface MainMenuProps {
   onOpenSettings: () => void;
@@ -42,6 +44,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
   /** 0 = idle, climbs to 1 while the start transition charges the seam. */
   const [charge, setCharge] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  /** Realm whose reveal cinematic is currently showing, or null. */
+  const [revealLevel, setRevealLevel] = useState<number | null>(null);
   const startedRef = useRef(false);
 
   /* Client-only state: read after mount so the server render stays stable. */
@@ -56,18 +61,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
-  /**
-   * Start transition: charge the dimensional seam, then hand off to the
-   * existing Phaser flow. `level` > 1 resumes at a previously unlocked realm.
-   */
-  const initiate = useCallback((level = 1) => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
-    const audio = AudioManager.getInstance();
-    audio.init();
-    audio.resume();
-
+  /** Charge the dimensional seam, then hand off to the existing Phaser flow. */
+  const proceedToGame = useCallback((level: number) => {
     const reduced =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -83,10 +78,39 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     }, 620);
   }, []);
 
+  /**
+   * Start transition. `level` > 1 resumes at a previously unlocked realm.
+   *
+   * A realm with a reveal cinematic (currently only Realm 1) plays it before
+   * the seam-charge handoff; realms without footage proceed straight through.
+   */
+  const initiate = useCallback((level = 1) => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    const audio = AudioManager.getInstance();
+    audio.init();
+    audio.resume();
+
+    if (getRealmReveal(level)) {
+      setRevealLevel(level);
+      return;
+    }
+
+    proceedToGame(level);
+  }, [proceedToGame]);
+
+  const handleRevealFinish = useCallback(() => {
+    const level = revealLevel ?? 1;
+    setRevealLevel(null);
+    proceedToGame(level);
+  }, [revealLevel, proceedToGame]);
+
   /* "PRESS ANY KEY TO BEGIN" — honour the promise printed in the key art. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (showTrailer || showHowToPlay || startedRef.current) return;
+      // The reveal cinematic owns Space/Enter while it is on screen.
+      if (showTrailer || showHowToPlay || startedRef.current || revealLevel !== null) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         initiate(1);
@@ -94,7 +118,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [initiate, showTrailer, showHowToPlay]);
+  }, [initiate, showTrailer, showHowToPlay, revealLevel]);
 
   const toggleSound = () => setIsMuted(AudioManager.getInstance().toggleMute());
 
@@ -105,6 +129,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     } catch {
       /* Browser refused (iOS Safari, permissions) — leave state as reported. */
     }
+  };
+
+  /** Clears saved realm progress so a returning player can start clean. */
+  const confirmRestartGame = () => {
+    SaveManager.resetProgress();
+    setUnlockedLevel(1);
+    setShowResetConfirm(false);
   };
 
   const canContinue = mounted && unlockedLevel > 1;
@@ -228,8 +259,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
             semantically and assistively titled without drawing over it. */}
         <h1 className="sr-only">G-One: The Last Protocol</h1>
 
-        {/* ---- Action cluster, seated in the lower scrim ---- */}
-        <div className="flex flex-col items-center gap-3 sm:gap-4 pb-1">
+        {/* ---- Action cluster, seated in the lower scrim ----
+             The top offset clears the metallic rule beneath the key art's
+             "THE LAST PROTOCOL" lockup, which the tagline bar was otherwise
+             sitting on top of. Viewport-relative so it holds as the art
+             rescales, clamped so it never collapses or runs into the footer.
+             Tune the 8vh if the ornament still reads tight. */}
+        <div className="flex flex-col items-center gap-3 sm:gap-4 pb-1 mt-[clamp(70px,12vh,150px)]">
           {/* Telemetry banner matching the exact notched geometry & typography of ProtocolButton */}
           <div className="clip-notch relative inline-flex items-center gap-2.5 px-5 py-2 border border-order-cyan/40 bg-graphite/90 backdrop-blur-md shadow-[0_0_20px_-6px_rgba(0,207,255,0.45)] animate-rise-in">
             <span className="w-1.5 h-1.5 rotate-45 bg-order-cyan shadow-[0_0_6px_#00cfff] shrink-0" />
@@ -275,6 +311,24 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
                     {continueName}
                   </span>
                 )}
+              </ProtocolButton>
+            )}
+
+            {/* Only surfaced once there is saved progress to clear — a
+                returning player's explicit way to play from Realm 1 without
+                "Initiate Protocol" silently leaving Realm 4 banked underneath.
+                Rest state matches the other secondary actions (Teaser, How to
+                Play); the destructive step lives in the confirm modal, not
+                the idle button colour. */}
+            {canContinue && (
+              <ProtocolButton
+                variant="neutral"
+                size="md"
+                onClick={() => setShowResetConfirm(true)}
+                icon={<RotateCcw className="w-4 h-4" />}
+                aria-label="Restart game and clear saved progress"
+              >
+                Restart Game
               </ProtocolButton>
             )}
 
@@ -342,6 +396,58 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
       )}
 
       {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+
+      {/* ==================================================================
+          REALM REVEAL — plays before gameplay for realms with footage
+          ================================================================== */}
+      {revealLevel !== null && (
+        <LevelRevealCinematic level={revealLevel} onFinish={handleRevealFinish} />
+      )}
+
+      {/* ==================================================================
+          RESTART GAME — CONFIRMATION
+          ================================================================== */}
+      {showResetConfirm && (
+        <ModalShell
+          title="Restart Game"
+          subtitle="This cannot be undone"
+          faction="entropy"
+          width="max-w-sm"
+          onClose={() => setShowResetConfirm(false)}
+          footer={
+            <div className="flex gap-2.5">
+              <ProtocolButton
+                variant="neutral"
+                size="md"
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1"
+              >
+                No, Keep Progress
+              </ProtocolButton>
+              <ProtocolButton
+                variant="danger"
+                size="md"
+                onClick={confirmRestartGame}
+                icon={<RotateCcw className="w-4 h-4" />}
+                className="flex-1"
+              >
+                Yes, Restart
+              </ProtocolButton>
+            </div>
+          }
+        >
+          <p className="font-body text-sm text-muted leading-relaxed">
+            All saved progress will be lost, including your furthest unlocked realm
+            {continueName ? (
+              <>
+                {' '}
+                (<span className="text-paper font-semibold">Realm {unlockedLevel} — {continueName}</span>)
+              </>
+            ) : null}
+            . You will start again from Realm 1. Are you sure you want to continue?
+          </p>
+        </ModalShell>
+      )}
     </div>
   );
 };

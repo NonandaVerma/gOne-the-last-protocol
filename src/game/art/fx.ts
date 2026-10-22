@@ -40,6 +40,20 @@ export function buildFx(scene: Phaser.Scene) {
   forge(scene, 'particle_red', 24, 24, (g) => softParticle(g, 24, VILLAIN.energy, VILLAIN.hot));
   forge(scene, 'particle_white', 20, 20, (g) => softParticle(g, 20, 0xdbeafe, ACCENT.white));
 
+  /**
+   * Soft contact shadow — a flattened dark ellipse with a falling-off edge.
+   * Shared by every grounded character and every elevated platform so both
+   * read as actually resting on a surface rather than floating flat against
+   * the painted backdrop. Reused scaled rather than rebaked per size.
+   */
+  forge(scene, 'contact_shadow', 128, 48, (g) => {
+    for (let i = 0; i < 6; i++) {
+      const t = i / 5;
+      g.fillStyle(0x000000, 0.32 * (1 - t));
+      g.fillEllipse(64, 24, 128 * (1 - t * 0.7), 48 * (1 - t * 0.7));
+    }
+  });
+
   forge(scene, 'particle_ember', 16, 16, (g) => {
     bloom(g, 8, 8, 8, ACCENT.magma, 0.6, 5);
     g.fillStyle(ACCENT.ember, 0.95);

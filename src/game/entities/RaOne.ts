@@ -72,6 +72,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
   private plume?: Phaser.GameObjects.Sprite;
   private ring?: Phaser.GameObjects.Image;
   private beamGuide?: Phaser.GameObjects.Graphics;
+  private shadow?: Phaser.GameObjects.Image;
   private pending: Phaser.Time.TimerEvent[] = [];
   private telegraphTweens: Phaser.Tweens.Tween[] = [];
   private beamTracker?: Phaser.Time.TimerEvent;
@@ -94,6 +95,11 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.setScale(RAONE_SCALE);
     this.setDepth(20);
     this.setFlipX(true);
+
+    if (d.scene.textures.exists('contact_shadow')) {
+      this.shadow = d.scene.add.image(d.x, d.groundTop + 6, 'contact_shadow');
+      this.shadow.setDepth(8).setAlpha(0.55).setDisplaySize(96, 30);
+    }
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);
@@ -786,6 +792,18 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     super.preUpdate(time, delta);
 
     this.aura?.setPosition(this.x, this.y - 10);
+
+    if (this.shadow) {
+      this.shadow.setX(this.x);
+      // Shrinks and fades with altitude while airborne, instead of the flat
+      // full-strength ellipse used for a grounded character — a cheap but
+      // readable height cue against the painted sky.
+      const altitude = Math.max(0, this.groundTop - this.y);
+      const falloff = Phaser.Math.Clamp(1 - altitude / 260, 0.15, 1);
+      this.shadow.setAlpha(0.55 * falloff);
+      this.shadow.setScale(0.6 + falloff * 0.4);
+    }
+
     if (this.plume?.visible) {
       const body = this.body as Phaser.Physics.Arcade.Body;
       this.plume.setPosition(this.x, body ? body.bottom - 16 : this.y + 40);
@@ -831,6 +849,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.plume?.destroy();
     this.ring?.destroy();
     this.beamGuide?.destroy();
+    this.shadow?.destroy();
     super.destroy(fromScene);
   }
 }

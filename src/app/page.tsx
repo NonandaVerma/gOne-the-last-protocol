@@ -11,6 +11,7 @@ import { SettingsMenu } from '../components/game/SettingsMenu';
 import { GameOverScreen } from '../components/game/GameOverScreen';
 import { VictoryScreen } from '../components/game/VictoryScreen';
 import { TouchControls } from '../components/game/TouchControls';
+import { StageBanner } from '../components/game/StageBanner';
 import { IntroCinematic } from '../components/game/IntroCinematic';
 
 /** Session-scoped: the cinematic replays on a fresh browser session only. */
@@ -90,6 +91,7 @@ export default function Home() {
         <>
           <GameHUD />
           <TouchControls />
+          <StageBanner />
         </>
       )}
 

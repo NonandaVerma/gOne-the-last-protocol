@@ -73,12 +73,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameReady }) => {
       onClick={handleContainerClick}
       className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none"
     >
+      {/* No max-width/aspect cap: the container is the full viewport, and
+          Phaser's ENVELOP scale mode (see gameConfig.ts) covers it edge to
+          edge on any aspect ratio instead of letterboxing to 16:9. */}
       <div
         id="game-container"
         ref={containerRef}
         tabIndex={0}
         style={{ outline: 'none' }}
-        className="w-full h-full max-w-[1280px] max-h-[720px] aspect-video shadow-2xl relative outline-none focus:outline-none"
+        className="w-full h-full shadow-2xl relative outline-none focus:outline-none"
       />
     </div>
   );

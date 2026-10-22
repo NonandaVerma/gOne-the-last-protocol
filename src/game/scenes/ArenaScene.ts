@@ -5,6 +5,7 @@ import { Projectile, createProjectilePool } from '../entities/Projectile';
 import { HazardManager } from '../entities/Hazard';
 import { StaticHazardField } from '../entities/StaticHazard';
 import { DynamicPlatformManager } from '../entities/DynamicPlatform';
+import { Enemy, EnemyManager } from '../entities/Enemy';
 import { LEVELS, VIEW_W, VIEW_H } from '../data/levels';
 import { REALM_TRANSITIONS } from '../data/story';
 import { AudioManager } from '../systems/AudioManager';
@@ -38,6 +39,7 @@ export class ArenaScene extends Phaser.Scene {
   private bossProjectiles?: Phaser.Physics.Arcade.Group;
   private hazards?: HazardManager;
   private staticHazards?: StaticHazardField;
+  private enemies?: EnemyManager;
   private powerUps?: PowerUpManager;
   private crosshair?: Phaser.GameObjects.Image;
   private lockOn?: Phaser.GameObjects.Image;
@@ -60,6 +62,7 @@ export class ArenaScene extends Phaser.Scene {
   private lastSafeY = 0;
   private gaps: Array<[number, number]> = [];
   private gateVisual?: Phaser.GameObjects.Rectangle;
+  private atmosphereGrade?: Phaser.GameObjects.Rectangle;
 
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA?: Phaser.Input.Keyboard.Key;
@@ -112,6 +115,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.juice = new Juice(this, 40);
     this.backdrop = new Backdrop(this, this.currentLevel, VIEW_W, VIEW_H);
+    this.createAtmosphereGrade(config);
 
     this.createGround(arena);
     this.createStaticPlatforms(arena);
@@ -150,6 +154,11 @@ export class ArenaScene extends Phaser.Scene {
       arena.staticHazards ?? [],
       config.difficulty.hazardWarnScale
     );
+
+    // Grunts fire through the boss's own projectile pool — it is already
+    // overlapped against the player, so no third pool or collider is needed.
+    this.enemies = new EnemyManager(this, this.juice, this.bossProjectiles, arena.enemies ?? []);
+    this.enemies.setTarget(this.player);
 
     this.powerUps = new PowerUpManager(this, this.juice, this.currentLevel);
     this.player.setPowerUpManager(this.powerUps);
@@ -259,7 +268,20 @@ export class ArenaScene extends Phaser.Scene {
         const scaleX = p.width / tileW;
         const plat = this.platforms!.create(p.x, p.y + tileH * 0.3, key);
         plat.setScale(scaleX, 0.65).refreshBody();
+        this.addContactShadow(p.x, p.y + tileH * 0.65, p.width);
       });
+  }
+
+  /**
+   * A soft dark ellipse beneath an elevated platform so it reads as resting
+   * in the scene's own light rather than floating flat against the painted
+   * backdrop. Purely decorative — drawn once, never touches collision.
+   */
+  private addContactShadow(x: number, y: number, width: number) {
+    if (!this.textures.exists('contact_shadow')) return;
+    const shadow = this.add.image(x, y, 'contact_shadow');
+    shadow.setDepth(6).setAlpha(0.55);
+    shadow.setDisplaySize(width * 0.82, 22);
   }
 
   private placePickups(arena: ArenaGeometry, relicSpawnSeconds: number) {
@@ -277,6 +299,29 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   /** A visible seam marking where the approach ends and the fight begins. */
+  /**
+   * A very low-alpha, screen-locked tint matching the realm's own light
+   * (its haze colour). Procedurally-drawn characters, platforms and hazards
+   * use flat, saturated vector fills; the painted backdrops are colour-graded
+   * renders. This wash is the cheap way to put both under the same light
+   * instead of looking like two different rendering pipelines stacked on
+   * top of each other — screen-space only, additive, deliberately subtle
+   * enough to never compete with gameplay readability.
+   */
+  private createAtmosphereGrade(config: LevelConfig) {
+    const grade = this.add
+      .rectangle(0, 0, VIEW_W, VIEW_H, config.environment.haze, 0.07)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      // Above the whole gameplay layer (player 22, boss 20, enemies 13,
+      // hazards, platforms) so characters are graded too, not just the
+      // scenery behind them; below the crosshair (45) and lock-on (29) so
+      // those stay fully legible.
+      .setDepth(28)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.atmosphereGrade = grade;
+  }
+
   private createArenaGate() {
     if (!this.arenaStartX) return;
     this.gateVisual = this.add
@@ -355,6 +400,36 @@ export class ArenaScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.boss, this.platforms);
+
+    if (this.enemies) {
+      // Drones walk the ground and platforms; seekers hover and ignore both.
+      this.physics.add.collider(this.enemies.getGroup(), this.platforms);
+
+      if (this.playerProjectiles) {
+        this.physics.add.overlap(this.playerProjectiles, this.enemies.getGroup(), (enemyObj, projObj) => {
+          const proj = projObj as Projectile;
+          const enemy = enemyObj as Enemy;
+          if (!proj.active || !enemy.active || proj.owner !== 'player' || this.isLevelEnding) return;
+          if (!proj.registerHit(enemy)) return;
+
+          const rawDmg = proj.damage;
+          const finalDmg = this.powerUps ? this.powerUps.modifyOutgoingDamage(rawDmg) : rawDmg;
+          const killed = enemy.takeDamage(finalDmg) && enemy.health <= 0;
+          if (killed && this.player) this.player.addOverdriveCharge(6);
+          if (!proj.pierce) proj.kill(true);
+        });
+      }
+
+      // Contact damage is gated to the drone's active swing window — walking
+      // into an idle or recovering drone never costs a unit.
+      this.physics.add.overlap(this.enemies.getGroup(), this.player, (playerObj, enemyObj) => {
+        const p = playerObj as GOne;
+        const enemy = enemyObj as Enemy;
+        if (!p.active || !enemy.active || p.isDead || this.isLevelEnding) return;
+        if (!enemy.isDealingContactDamage()) return;
+        p.takeDamage(enemy.contactDamage, enemy.x);
+      });
+    }
 
     // Dynamic platforms carry the player; landing on a collapsing one arms it.
     if (this.dynamicPlatforms) {
@@ -552,6 +627,7 @@ export class ArenaScene extends Phaser.Scene {
       // otherwise fire against destroyed sprites on the next scene.
       try { this.staticHazards?.destroy(); } catch (_) {}
       try { this.dynamicPlatforms?.destroy(); } catch (_) {}
+      try { this.enemies?.destroy(); } catch (_) {}
       try { this.hazards?.clearAll(); } catch (_) {}
       try { this.powerUps?.clearAll(); } catch (_) {}
       try { this.backdrop?.destroy(); } catch (_) {}
@@ -585,6 +661,7 @@ export class ArenaScene extends Phaser.Scene {
     } catch (_) {}
     try { this.hazards?.clearAll(); } catch (_) {}
     try { this.staticHazards?.destroy(); } catch (_) {}
+    try { this.enemies?.destroy(); } catch (_) {}
     try { this.juice?.clearFreeze(); } catch (_) {}
   }
 
@@ -607,8 +684,27 @@ export class ArenaScene extends Phaser.Scene {
   private showLevelTransition(nextLevel: number, storyLines: string[]) {
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'LEVEL_TRANSITION');
 
+    // Realm 1's fifth internal stage ("Protocol Fragment") has no traversal
+    // geometry of its own yet, so its painted art becomes this reward beat
+    // between realms instead of sitting unused.
+    const stageArtKey = `bg_realm${this.currentLevel}_stage5`;
+    const hasStageArt = this.textures.exists(stageArtKey);
+    const fadeTargets: Phaser.GameObjects.GameObject[] = [];
+
+    if (hasStageArt) {
+      const art = this.add
+        .image(0, 0, stageArtKey)
+        .setOrigin(0, 0)
+        .setScrollFactor(0)
+        .setDepth(79)
+        .setAlpha(0);
+      art.setDisplaySize(VIEW_W, VIEW_H);
+      fadeTargets.push(art);
+    }
+
     const overlay = this.add.graphics().setScrollFactor(0).setDepth(80).setAlpha(0);
-    overlay.fillStyle(0x070a0f, 0.94);
+    // Let the reward art read as a place, not just a wash behind text.
+    overlay.fillStyle(0x070a0f, hasStageArt ? 0.6 : 0.94);
     overlay.fillRect(0, 0, VIEW_W, VIEW_H);
 
     // The dimensional seam as the transition device: a vertical fracture that
@@ -657,7 +753,11 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(82)
       .setAlpha(0);
 
-    this.tweens.add({ targets: [overlay, txt, title, prompt, seam], alpha: 1, duration: 500 });
+    // The seam is deliberately excluded here: it stays invisible while the
+    // player reads the card and only appears as the expanding wipe on
+    // proceed(). Fading it in here was the bug — a static full-opacity line
+    // sitting through the whole card, not the intended transition effect.
+    this.tweens.add({ targets: [overlay, txt, title, prompt, ...fadeTargets], alpha: 1, duration: 500 });
     this.tweens.add({
       targets: prompt,
       alpha: { from: 0.4, to: 1 },
@@ -681,7 +781,9 @@ export class ArenaScene extends Phaser.Scene {
 
       try { this.powerUps?.clearAll(); } catch (_) {}
 
-      // Seam expands to fill the screen, then the next realm loads behind it.
+      // Seam appears only now, expanding to fill the screen before the next
+      // realm loads behind it — the actual transition wipe, not a static line.
+      seam.setAlpha(1);
       this.tweens.add({
         targets: seam,
         scaleX: 400,
@@ -778,6 +880,7 @@ export class ArenaScene extends Phaser.Scene {
     this.powerUps?.update(time, delta);
     this.staticHazards?.update(time, delta);
     this.dynamicPlatforms?.update(time, delta);
+    this.enemies?.update(time);
 
     if (this.backdrop) {
       this.backdrop.update(this.cameras.main.scrollX, this.cameras.main.scrollY, delta);

@@ -34,6 +34,8 @@ interface Managed {
   /** `phasing` cycle clock, ms. */
   clock?: number;
   solid?: boolean;
+  /** Follows the sprite each frame so moving platforms stay grounded-looking. */
+  shadow?: Phaser.GameObjects.Image;
 }
 
 export class DynamicPlatformManager {
@@ -68,7 +70,20 @@ export class DynamicPlatformManager {
 
       this.group.add(sprite);
 
-      const managed: Managed = { spec, sprite, clock: spec.phaseOffsetMs ?? 0, solid: true };
+      let shadow: Phaser.GameObjects.Image | undefined;
+      if (scene.textures.exists('contact_shadow')) {
+        shadow = scene.add.image(spec.x, spec.y + tileH * 0.65, 'contact_shadow');
+        shadow.setDepth(6).setAlpha(0.5);
+        shadow.setDisplaySize(spec.width * 0.82, 22);
+      }
+
+      const managed: Managed = {
+        spec,
+        sprite,
+        clock: spec.phaseOffsetMs ?? 0,
+        solid: true,
+        shadow,
+      };
       this.items.push(managed);
 
       if (spec.behaviour === 'moving') this.startMoving(managed);
@@ -157,6 +172,7 @@ export class DynamicPlatformManager {
     this.juice.dust(m.sprite.x, m.sprite.y, 6, 0x7a5a48);
 
     const homeY = m.sprite.y;
+    if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0, duration: 300 });
     this.scene.tweens.add({
       targets: m.sprite,
       y: homeY + 260,
@@ -177,6 +193,7 @@ export class DynamicPlatformManager {
             body.enable = true;
             body.updateFromGameObject();
             this.scene.tweens.add({ targets: m.sprite, alpha: 1, duration: 240 });
+            if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0.5, duration: 240 });
           })
         );
       },
@@ -187,6 +204,14 @@ export class DynamicPlatformManager {
 
   public update(_time: number, delta: number) {
     if (!this.alive) return;
+
+    // Moving platforms carry their shadow with them; everything else's
+    // shadow stays put since the platform itself doesn't translate.
+    for (const m of this.items) {
+      if (m.shadow && m.spec.behaviour === 'moving') {
+        m.shadow.setPosition(m.sprite.x, m.shadow.y);
+      }
+    }
 
     for (const m of this.items) {
       if (m.spec.behaviour !== 'phasing') continue;
@@ -213,9 +238,11 @@ export class DynamicPlatformManager {
         body.enable = true;
         body.updateFromGameObject();
         this.scene.tweens.add({ targets: m.sprite, alpha: 1, duration: FADE_MS });
+        if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0.5, duration: FADE_MS });
       } else {
         body.enable = false;
         this.scene.tweens.add({ targets: m.sprite, alpha: 0.12, duration: FADE_MS });
+        if (m.shadow) this.scene.tweens.add({ targets: m.shadow, alpha: 0, duration: FADE_MS });
       }
     }
   }
@@ -230,7 +257,13 @@ export class DynamicPlatformManager {
       }
     });
     this.timers = [];
-    this.items.forEach((m) => this.scene.tweens.killTweensOf(m.sprite));
+    this.items.forEach((m) => {
+      this.scene.tweens.killTweensOf(m.sprite);
+      if (m.shadow) {
+        this.scene.tweens.killTweensOf(m.shadow);
+        m.shadow.destroy();
+      }
+    });
     this.items = [];
     try {
       this.group.clear(true, true);

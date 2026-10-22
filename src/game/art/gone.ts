@@ -62,6 +62,32 @@ function at(c: Vec, a: number, forward: number, upward: number): Vec {
   return { x: c.x + b.f.x * forward + b.u.x * upward, y: c.y + b.f.y * forward + b.u.y * upward };
 }
 
+/**
+ * The flowing cyan cape from the key art. Anchored at the back shoulder,
+ * trailing behind and below the hip. Drawn first, so the torso and back arm
+ * naturally overlap its leading edge — no depth sorting needed beyond call
+ * order. `a` (torso lean) already varies per animation frame, so the sway
+ * derived from it animates the cape across the baked sheet for free, with no
+ * separate time input required.
+ */
+function cape(g: Gfx, sk: ReturnType<typeof solve>, a: number) {
+  const sway = Math.sin(a * 5) * 8;
+  const top = at(sk.shoulderBack, a, 4, 20);
+  const topBack = at(sk.shoulderBack, a, -8, 15);
+  const mid = at(sk.pelvis, a, -20 + sway * 0.4, -2);
+  const midBack = at(sk.pelvis, a, -38 + sway * 0.7, -16);
+  const tailNear = at(sk.pelvis, a, -24 + sway * 0.9, -50);
+  const tailFar = at(sk.pelvis, a, -50 + sway * 1.3, -68);
+
+  // Base cloth mass, darkest at the trailing edge.
+  poly(g, [top, topBack, midBack, tailFar, tailNear, mid], mix(HERO.shadow, 0x000000, 0.2), 0.92);
+  // Lit inner face, catching the chest core's glow.
+  poly(g, [top, mid, midBack, topBack], mix(HERO.base, HERO.shadow, 0.3), 0.75);
+  // Energy piping along the trailing edge.
+  path(g, [topBack, midBack, tailFar], HERO.energy, 0.55, 2);
+  path(g, [top, tailNear], mix(HERO.energy, HERO.shadow, 0.5), 0.3, 1.2);
+}
+
 // ---------------------------------------------------------------------------
 // Parts
 // ---------------------------------------------------------------------------
@@ -199,6 +225,9 @@ export function drawGOne(g: Gfx, pose: Pose) {
   // Ambient backlight so the silhouette separates from dark arenas.
   bloom(g, sk.chest.x, sk.chest.y + 6, 62, HERO.energy, 0.12 * glow, 6);
 
+  // Cape first: furthest-back element, so the body overlaps its leading edge.
+  cape(g, sk, a);
+
   // --- BACK LAYER -----------------------------------------------------------
   armouredLimb(g, sk.shoulderBack, sk.elbowBack, P.upperArmW[0], P.upperArmW[1], HERO, { depth: 0.85 });
   armouredLimb(g, sk.elbowBack, sk.handBack, P.foreArmW[0], P.foreArmW[1], HERO, { depth: 0.85 });
@@ -285,6 +314,17 @@ export function drawGOne(g: Gfx, pose: Pose) {
 
   // --- CHEST CORE -----------------------------------------------------------
   energyCore(g, coreAt.x, coreAt.y, 8.5, HERO.energy, HERO.hot, mix(HERO.shadow, HERO.base, 0.5), glow);
+
+  // Triangular highlight on top of the circular housing — the key art's
+  // core reads as a faceted triangle, not a plain disc.
+  const triR = 7.5;
+  const triPts: Vec[] = [
+    { x: coreAt.x, y: coreAt.y - triR },
+    { x: coreAt.x - triR * 0.88, y: coreAt.y + triR * 0.7 },
+    { x: coreAt.x + triR * 0.88, y: coreAt.y + triR * 0.7 },
+  ];
+  poly(g, triPts, HERO.hot, 0.55 * glow);
+  outline(g, triPts, HERO.energy, 0.9, 1.4);
 
   // --- FRONT ARM & PAULDRON -------------------------------------------------
   pauldron(g, sk.shoulderFront, a, 1, 0);
