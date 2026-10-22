@@ -38,13 +38,46 @@ interface Cyclic {
   cooldownMs: number;
 }
 
+type DoorPhase = 'open' | 'warning' | 'closing' | 'sealed' | 'opening';
+
+interface SecurityDoor {
+  spec: StaticHazardSpec;
+  panel: Phaser.Physics.Arcade.Sprite;
+  openY: number;
+  closedY: number;
+  phase: DoorPhase;
+  remaining: number;
+  warnMs: number;
+  closeMs: number;
+  holdMs: number;
+  triggered: boolean;
+}
+
+interface LockedGate {
+  spec: StaticHazardSpec;
+  panel: Phaser.Physics.Arcade.Sprite;
+  openY: number;
+  closedY: number;
+  opened: boolean;
+}
+
 export class StaticHazardField {
   private scene: Phaser.Scene;
   private juice: Juice;
   private group: Phaser.Physics.Arcade.Group;
   private cyclic: Cyclic[] = [];
+  private doors: SecurityDoor[] = [];
+  private gates: LockedGate[] = [];
   private owned: Phaser.GameObjects.GameObject[] = [];
   private alive = true;
+  /**
+   * Sealed doors/gates need genuine physical blocking, not the shared
+   * damage group — that group is wired to the player via `physics.add
+   * .overlap` (damage-only; the player passes straight through), so a
+   * "locked gate" built on it would never actually stop anyone. This group
+   * gets its own `collider` from the scene instead.
+   */
+  private solidGroup: Phaser.Physics.Arcade.Group;
 
   /**
    * @param group  shared damage group the scene already overlaps with the
@@ -62,9 +95,12 @@ export class StaticHazardField {
     this.scene = scene;
     this.juice = juice;
     this.group = group;
+    this.solidGroup = scene.physics.add.group({ allowGravity: false, immovable: true });
 
     specs.forEach((spec) => {
       if (spec.kind === 'spikes') this.buildSpikes(spec);
+      else if (spec.kind === 'security_door') this.buildSecurityDoor(spec, warnScale);
+      else if (spec.kind === 'locked_gate') this.buildLockedGate(spec);
       else this.buildCyclic(spec, warnScale);
     });
   }
@@ -88,6 +124,169 @@ export class StaticHazardField {
 
     this.group.add(sprite);
     this.owned.push(sprite);
+  }
+
+  // -------------------------------------------------------------------------
+  // Security door — trigger-based, not cyclic. Armed once by crossing
+  // `triggerX`, then warns, seals, holds, and reopens. Never a permanent
+  // block: even a player caught on the wrong side gets it back after holdMs.
+  // -------------------------------------------------------------------------
+
+  private buildSecurityDoor(spec: StaticHazardSpec, warnScale: number) {
+    const height = spec.height ?? 220;
+    const openY = spec.y - height - 20;
+    const closedY = spec.y - height / 2;
+
+    const top = this.scene.add.image(spec.x, spec.y - height - 12, 'hazard_door_housing').setDepth(17);
+    this.owned.push(top);
+
+    const panel = this.scene.physics.add.sprite(spec.x, openY, 'hazard_door_panel');
+    panel.setDisplaySize(spec.width, height).setDepth(16);
+
+    const body = panel.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(false);
+    body.setImmovable(true);
+    body.enable = false;
+
+    this.solidGroup.add(panel);
+    this.owned.push(panel);
+
+    this.doors.push({
+      spec,
+      panel,
+      openY,
+      closedY,
+      phase: 'open',
+      remaining: 0,
+      warnMs: Math.round((spec.warnMs ?? 900) * warnScale),
+      closeMs: spec.closeMs ?? 700,
+      holdMs: spec.holdMs ?? 2500,
+      triggered: false,
+    });
+  }
+
+  /** Scene calls this every frame with the player's world X. */
+  /** Scene colliders this against the player for genuine physical blocking. */
+  public getSolidGroup() {
+    return this.solidGroup;
+  }
+
+  public checkTrigger(playerX: number) {
+    for (const d of this.doors) {
+      if (!d.triggered && d.spec.triggerX !== undefined && playerX >= d.spec.triggerX) {
+        d.triggered = true;
+        this.armDoor(d);
+      }
+    }
+  }
+
+  private armDoor(d: SecurityDoor) {
+    d.phase = 'warning';
+    d.remaining = d.warnMs;
+    AudioManager.getInstance().playShieldDeflect();
+    this.scene.tweens.add({
+      targets: d.panel,
+      alpha: { from: 1, to: 0.4 },
+      duration: 160,
+      yoyo: true,
+      repeat: Math.max(1, Math.floor(d.warnMs / 320)),
+    });
+  }
+
+  private closeDoor(d: SecurityDoor) {
+    d.phase = 'closing';
+    d.remaining = d.closeMs;
+    d.panel.setAlpha(1);
+    AudioManager.getInstance().playExplosion();
+    this.juice.shake(0.008, 180);
+    this.scene.tweens.add({
+      targets: d.panel,
+      y: d.closedY,
+      duration: d.closeMs,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        const body = d.panel.body as Phaser.Physics.Arcade.Body;
+        body.updateFromGameObject();
+      },
+    });
+  }
+
+  private sealDoor(d: SecurityDoor) {
+    d.phase = 'sealed';
+    d.remaining = d.holdMs;
+    const body = d.panel.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    body.updateFromGameObject();
+  }
+
+  private openDoor(d: SecurityDoor) {
+    d.phase = 'opening';
+    d.remaining = 400;
+    const body = d.panel.body as Phaser.Physics.Arcade.Body;
+    body.enable = false;
+    this.scene.tweens.add({
+      targets: d.panel,
+      y: d.openY,
+      duration: 400,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        d.phase = 'open';
+        d.triggered = false; // re-armable if the player walks back and forth
+      },
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Locked gate — starts sealed, opens once and permanently once its guard
+  // group is cleared. Progression-gated, not timed; no telegraph needed
+  // since the barrier is visible and solid from the moment the player can
+  // see it, same as any ordinary wall.
+  // -------------------------------------------------------------------------
+
+  private buildLockedGate(spec: StaticHazardSpec) {
+    const height = spec.height ?? 220;
+    const closedY = spec.y - height / 2;
+    const openY = spec.y - height - 40;
+
+    const housing = this.scene.add.image(spec.x, spec.y - height - 12, 'hazard_door_housing').setDepth(17);
+    this.owned.push(housing);
+
+    const panel = this.scene.physics.add.sprite(spec.x, closedY, 'hazard_door_panel');
+    panel.setDisplaySize(spec.width, height).setDepth(16).setTint(0xffb347);
+
+    const body = panel.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(false);
+    body.setImmovable(true);
+    body.enable = true;
+
+    this.solidGroup.add(panel);
+    this.owned.push(panel);
+
+    this.gates.push({ spec, panel, openY, closedY, opened: false });
+  }
+
+  /**
+   * Scene calls this every frame with a lookup for whether a guard group is
+   * still alive. Opens any gate whose group has just been cleared.
+   */
+  public updateGuardGroups(isGroupAlive: (guardGroup: string) => boolean) {
+    for (const gate of this.gates) {
+      if (gate.opened || !gate.spec.guardGroup) continue;
+      if (isGroupAlive(gate.spec.guardGroup)) continue;
+
+      gate.opened = true;
+      const body = gate.panel.body as Phaser.Physics.Arcade.Body;
+      body.enable = false;
+      AudioManager.getInstance().playOverdrive();
+      this.juice.shake(0.008, 220);
+      this.scene.tweens.add({
+        targets: gate.panel,
+        y: gate.openY,
+        alpha: 0.3,
+        duration: 650,
+        ease: 'Quad.easeOut',
+      });
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -226,6 +425,24 @@ export class StaticHazardField {
           break;
       }
     }
+
+    for (const d of this.doors) {
+      if (d.phase === 'open') continue;
+      d.remaining -= delta;
+      if (d.remaining > 0) continue;
+      switch (d.phase) {
+        case 'warning':
+          this.closeDoor(d);
+          break;
+        case 'closing':
+          this.sealDoor(d);
+          break;
+        case 'sealed':
+          this.openDoor(d);
+          break;
+        // 'opening' resolves itself via the tween's onComplete.
+      }
+    }
   }
 
   public destroy() {
@@ -234,6 +451,19 @@ export class StaticHazardField {
       this.scene.tweens.killTweensOf(h.sprite);
     });
     this.cyclic = [];
+    this.doors.forEach((d) => {
+      this.scene.tweens.killTweensOf(d.panel);
+    });
+    this.doors = [];
+    this.gates.forEach((g) => {
+      this.scene.tweens.killTweensOf(g.panel);
+    });
+    this.gates = [];
+    try {
+      this.solidGroup.clear(true, true);
+    } catch {
+      /* group already destroyed with the scene */
+    }
     this.owned.forEach((o) => {
       try {
         if (o && (o as { active?: boolean }).active !== false) o.destroy();

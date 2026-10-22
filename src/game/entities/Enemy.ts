@@ -64,6 +64,7 @@ const KIND_CONFIG: Record<EnemyKind, KindConfig> = {
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   public readonly kind: EnemyKind;
+  public readonly guardGroup?: string;
   public health: number;
   public readonly maxHealth: number;
   public state: EnemyState = 'idle';
@@ -88,6 +89,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     const cfg = KIND_CONFIG[spec.kind];
     super(scene, spec.x, spec.y, `enemy_${spec.kind}`);
     this.kind = spec.kind;
+    this.guardGroup = spec.guardGroup;
     this.cfg = cfg;
     this.health = cfg.health;
     this.maxHealth = cfg.health;
@@ -341,6 +343,11 @@ export class EnemyManager {
 
   public setTarget(player: GOne) {
     this.enemies.forEach((e) => e.setTarget(player));
+  }
+
+  /** True while any living, active enemy still carries this guard group. */
+  public isGroupAlive(guardGroup: string): boolean {
+    return this.enemies.some((e) => e.active && e.guardGroup === guardGroup);
   }
 
   public getGroup() {

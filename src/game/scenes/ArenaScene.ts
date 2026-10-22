@@ -63,6 +63,8 @@ export class ArenaScene extends Phaser.Scene {
   private gaps: Array<[number, number]> = [];
   private gateVisual?: Phaser.GameObjects.Rectangle;
   private atmosphereGrade?: Phaser.GameObjects.Rectangle;
+  /** Guards the Realm 6 finale escalation so it fires exactly once. */
+  private finaleEscalated = false;
 
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA?: Phaser.Input.Keyboard.Key;
@@ -87,6 +89,7 @@ export class ArenaScene extends Phaser.Scene {
     this.isPaused = false;
     this.isLevelEnding = false;
     this.arenaEntered = false;
+    this.finaleEscalated = false;
     this.startedAtCheckpoint = Boolean(data?.fromCheckpoint);
     SaveManager.saveUnlockedLevel(this.currentLevel);
   }
@@ -401,6 +404,13 @@ export class ArenaScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.boss, this.platforms);
 
+    // Sealed security doors / locked gates physically block — the shared
+    // hazard group below is damage-only overlap, which would let the player
+    // walk straight through a "sealed" door with just a damage tick.
+    if (this.staticHazards) {
+      this.physics.add.collider(this.player, this.staticHazards.getSolidGroup());
+    }
+
     if (this.enemies) {
       // Drones walk the ground and platforms; seekers hover and ignore both.
       this.physics.add.collider(this.enemies.getGroup(), this.platforms);
@@ -580,6 +590,23 @@ export class ArenaScene extends Phaser.Scene {
       if (dist <= data.radius) this.boss.takeDamage(data.damage);
     };
 
+    // Realm 6 only: the arena itself reacts once Ra-One enters his final
+    // phase — the campaign's one explicit "the battlefield escalates for
+    // the finale" beat. Cosmetic only (camera punch, flash, a deeper
+    // atmosphere wash) — no new hazard geometry, so there is nothing here
+    // that needs jump-safety or softlock verification.
+    const onBossPhaseChanged = (data: { phase: number }) => {
+      if (this.currentLevel !== 6 || this.finaleEscalated || data.phase < 3) return;
+      this.finaleEscalated = true;
+      this.juice?.zoomPunch(0.05, 260);
+      this.juice?.flash(VILLAIN.energy, 0.4, 320);
+      this.juice?.shake(0.016, 380);
+      if (this.atmosphereGrade) {
+        this.tweens.add({ targets: this.atmosphereGrade, alpha: 0.16, duration: 500 });
+      }
+      AudioManager.getInstance().playOverdrive();
+    };
+
     const onBossDied = () => {
       if (this.isLevelEnding) return;
       this.isLevelEnding = true;
@@ -604,6 +631,7 @@ export class ArenaScene extends Phaser.Scene {
 
     EventBus.on(GAME_EVENTS.SCREEN_SHAKE, onShake);
     EventBus.on(GAME_EVENTS.OVERDRIVE_BURST, onOverdriveBurst);
+    EventBus.on(GAME_EVENTS.BOSS_PHASE_CHANGED, onBossPhaseChanged);
     EventBus.on(GAME_EVENTS.BOSS_DIED, onBossDied);
     EventBus.on(GAME_EVENTS.PLAYER_DIED, onPlayerDied);
     EventBus.on(GAME_EVENTS.PAUSE_GAME, onTogglePause);
@@ -615,6 +643,7 @@ export class ArenaScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off(GAME_EVENTS.SCREEN_SHAKE, onShake);
       EventBus.off(GAME_EVENTS.OVERDRIVE_BURST, onOverdriveBurst);
+      EventBus.off(GAME_EVENTS.BOSS_PHASE_CHANGED, onBossPhaseChanged);
       EventBus.off(GAME_EVENTS.BOSS_DIED, onBossDied);
       EventBus.off(GAME_EVENTS.PLAYER_DIED, onPlayerDied);
       EventBus.off(GAME_EVENTS.PAUSE_GAME, onTogglePause);
@@ -742,16 +771,46 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(82)
       .setAlpha(0);
 
+    // Realm 1's exit is the Protocol Fragment beat: a real interactive pickup
+    // rather than a click-anywhere dismissal, matching the "contextual
+    // interaction, absorption, reward" sequence other realms don't have art
+    // for yet.
+    const isFragmentBeat = hasStageArt && this.currentLevel === 1;
+
     const prompt = this.add
-      .text(VIEW_W / 2, VIEW_H / 2 + 150, '[ CLICK OR PRESS SPACE TO CONTINUE ]', {
-        fontFamily: 'Rajdhani, sans-serif',
-        fontSize: '18px',
-        color: '#8395A5',
-      })
+      .text(
+        VIEW_W / 2,
+        VIEW_H / 2 + 150,
+        isFragmentBeat ? '[ CLICK THE FRAGMENT OR PRESS E TO ABSORB ]' : '[ CLICK OR PRESS SPACE TO CONTINUE ]',
+        {
+          fontFamily: 'Rajdhani, sans-serif',
+          fontSize: '18px',
+          color: '#8395A5',
+        }
+      )
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(82)
       .setAlpha(0);
+
+    let fragment: Phaser.GameObjects.Arc | undefined;
+    if (isFragmentBeat) {
+      fragment = this.add
+        .circle(VIEW_W / 2, VIEW_H / 2 - 150, 16, HERO.energy, 0.9)
+        .setScrollFactor(0)
+        .setDepth(82)
+        .setAlpha(0)
+        .setStrokeStyle(2, 0xffffff, 0.8);
+      fadeTargets.push(fragment);
+      this.tweens.add({
+        targets: fragment,
+        scale: { from: 0.85, to: 1.15 },
+        yoyo: true,
+        repeat: -1,
+        duration: 700,
+        ease: 'Sine.easeInOut',
+      });
+    }
 
     // The seam is deliberately excluded here: it stays invisible while the
     // player reads the card and only appears as the expanding wipe on
@@ -781,6 +840,14 @@ export class ArenaScene extends Phaser.Scene {
 
       try { this.powerUps?.clearAll(); } catch (_) {}
 
+      if (isFragmentBeat && fragment) {
+        // Absorption: the fragment collapses into a burst rather than just
+        // vanishing — the one real reward feedback this beat has to give.
+        this.juice?.impact(fragment.x, fragment.y, 'player', { scale: 1.6, sparks: 20, ring: true });
+        AudioManager.getInstance().playRelicCollect();
+        this.tweens.add({ targets: fragment, scale: 0, alpha: 0, duration: 220 });
+      }
+
       // Seam appears only now, expanding to fill the screen before the next
       // realm loads behind it — the actual transition wipe, not a static line.
       seam.setAlpha(1);
@@ -789,15 +856,42 @@ export class ArenaScene extends Phaser.Scene {
         scaleX: 400,
         duration: 420,
         ease: 'Quad.easeIn',
+        delay: isFragmentBeat ? 260 : 0,
         onComplete: () => this.scene.restart({ level: nextLevel, fromCheckpoint: false }),
       });
     };
 
-    prompt.setInteractive({ useHandCursor: true });
-    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, VIEW_W, VIEW_H), Phaser.Geom.Rectangle.Contains);
-
     // Brief debounce so a combat click does not skip the card instantly.
     this.time.delayedCall(250, () => {
+      // The fragment is the advertised interaction (click it, or press E),
+      // but it is NEVER the only way through — every other transition in
+      // the game accepts click-anywhere/Space as a safety net, and this one
+      // previously didn't. A required precise interaction with zero
+      // fallback is exactly the kind of softlock risk this project
+      // otherwise guards against everywhere else; fixed by always also
+      // wiring the generic fallback below, regardless of isFragmentBeat.
+      if (isFragmentBeat && fragment) {
+        fragment.setInteractive({ useHandCursor: true });
+        fragment.on('pointerdown', proceed);
+        cleanupFns.push(() => {
+          try {
+            fragment?.off('pointerdown', proceed);
+          } catch (_) {}
+        });
+
+        const onFragmentKey = (e: KeyboardEvent) => {
+          if (e.code === 'KeyE' || e.key === 'e' || e.key === 'E') {
+            e.preventDefault();
+            proceed();
+          }
+        };
+        window.addEventListener('keydown', onFragmentKey, { capture: true });
+        cleanupFns.push(() => window.removeEventListener('keydown', onFragmentKey, { capture: true }));
+      }
+
+      prompt.setInteractive({ useHandCursor: true });
+      overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, VIEW_W, VIEW_H), Phaser.Geom.Rectangle.Contains);
+
       prompt.on('pointerdown', proceed);
       overlay.on('pointerdown', proceed);
       this.input.once('pointerdown', proceed);
@@ -879,6 +973,8 @@ export class ArenaScene extends Phaser.Scene {
     this.juice?.update(time);
     this.powerUps?.update(time, delta);
     this.staticHazards?.update(time, delta);
+    if (this.player) this.staticHazards?.checkTrigger(this.player.x);
+    this.staticHazards?.updateGuardGroups((g) => this.enemies?.isGroupAlive(g) ?? false);
     this.dynamicPlatforms?.update(time, delta);
     this.enemies?.update(time);
 

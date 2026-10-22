@@ -63,12 +63,29 @@ export const LEVELS: Record<number, LevelConfig> = {
       bossSpawnX: 2880,
       arenaStartX: 1860,
       hasLava: false,
-      // Long flat run-up, then three wide steps. Nothing is punishing.
+      // Long flat run-up (Stage 1), then a rising vertical section (Stage 2),
+      // then the bridge proper (Stage 3), then the arena (Stage 4).
       platforms: [
         { x: 760, y: 540, width: 320 },
+        // Stage 2 "Sky Sentinels" — a vertical energy lift the player can
+        // ride up to an elevated optional platform. The MANDATORY route is
+        // still the ground-level path below, so missing or skipping the lift
+        // never blocks progress; it's a reachable bonus, not a gate.
+        {
+          x: 980,
+          y: 420,
+          width: 140,
+          behaviour: 'moving',
+          travelY: -160,
+          travelMs: 2600,
+        },
         { x: 1180, y: 506, width: 300 },
-        { x: 1560, y: 474, width: 280 },
-        // Arena
+        // Stage 3 "The Shattered Bridge" — the span itself collapses once
+        // stood on. The 1660 platform (unchanged height/reach from before)
+        // remains as the fallback route for a player who doesn't trust it.
+        { x: 1420, y: 474, width: 220, behaviour: 'collapsing' },
+        { x: 1660, y: 474, width: 220 },
+        // Arena (Stage 4 — the boss floor itself)
         { x: 2180, y: 498, width: 300 },
         { x: 2620, y: 440, width: 340 },
         { x: 3060, y: 498, width: 300 },
@@ -76,20 +93,35 @@ export const LEVELS: Record<number, LevelConfig> = {
       // One 220px pit — a single forgiving jump, well inside the 408 budget.
       gaps: [[900, 1120]],
       staticHazards: [
-        { kind: 'spikes', x: 1360, y: GROUND_TOP, width: 150 },
+        // Stage 1 "Awakening" power-failure beat: crossing x=250 arms a
+        // klaxon warning, then the gate seals at x=550. ~300px of run-up at
+        // maxSpeed (430px/s, ~0.7s) against a 1.6s warn+close budget — easy
+        // to clear at a dead sprint, reads as tense rather than being a real
+        // execution check, matching Realm 1's deliberately forgiving curve.
+        { kind: 'security_door', x: 550, y: GROUND_TOP, width: 40, height: 220, triggerX: 250, warnMs: 900, closeMs: 700, holdMs: 2500 },
+        // Stage 3: spikes and the gate sit BEFORE the collapsing platform's
+        // footprint (1310-1530), not beneath it — spikes never telegraph, so
+        // a mistimed collapse dropping the player onto them would be an
+        // unreadable hit. This way the ground route's danger is resolved
+        // before the player ever commits to the elevated crossing.
+        { kind: 'spikes', x: 1250, y: GROUND_TOP, width: 100 },
+        { kind: 'laser_gate', x: 1300, y: GROUND_TOP, width: 14, height: 240, warnMs: 700, activeMs: 850, cooldownMs: 1300, offsetMs: 0 },
       ],
       pickups: [
+        // Reward for taking the Stage 2 lift rather than walking past it.
+        { x: 980, y: 356, type: 'overdrive_shard' },
         { x: 1180, y: 440, type: 'phoenix_core' },
-        { x: 1560, y: 410, type: 'aegis_olympus' },
+        { x: 1660, y: 410, type: 'aegis_olympus' },
       ],
       // Corruption's first foothold in an otherwise untouched realm — two
       // grunts on the wide run-up (room to practice Pulse Shot or just dash
-      // past), a third on the first platform, and one Seeker guarding the
-      // approach to the gate so the player must engage at range at least
-      // once before Realm 2 makes that mandatory.
+      // past), a third on the first platform, a Seeker stationed on the
+      // elevated Stage 2 lift platform (forces aerial engagement while
+      // riding the lift), and one more guarding the approach to the gate.
       enemies: [
         { kind: 'drone', x: 540, y: GROUND_TOP - 60, patrolMin: 440, patrolMax: 680 },
         { kind: 'drone', x: 1180, y: 440, patrolMin: 1040, patrolMax: 1320 },
+        { kind: 'seeker', x: 980, y: 300 },
         { kind: 'seeker', x: 1680, y: GROUND_TOP - 170 },
       ],
     },
@@ -144,10 +176,22 @@ export const LEVELS: Record<number, LevelConfig> = {
         { kind: 'laser_gate', x: 980, y: GROUND_TOP, width: 14, height: 200, warnMs: 700, activeMs: 900, cooldownMs: 1400, offsetMs: 0 },
         { kind: 'laser_gate', x: 1340, y: GROUND_TOP, width: 14, height: 200, warnMs: 700, activeMs: 900, cooldownMs: 1400, offsetMs: 1500 },
         { kind: 'spikes', x: 1240, y: GROUND_TOP, width: 160 },
+        // The fortress's inner gate: sealed on sight, not a timed hazard.
+        // Stays shut until the 'inner_hall' guard group is wiped, then opens
+        // once and permanently — the "breach" beat, not another gauntlet.
+        { kind: 'locked_gate', x: 1900, y: GROUND_TOP, width: 40, height: 220, guardGroup: 'inner_hall' },
       ],
       pickups: [
         { x: 1080, y: 420, type: 'aegis_olympus' },
         { x: 1760, y: 404, type: 'overdrive_shard' },
+      ],
+      // A fortress now actually garrisoned: a free-roaming drone in the
+      // outer approach, then the inner-hall squad (drone + seeker) that
+      // must be cleared before the locked gate above will open.
+      enemies: [
+        { kind: 'drone', x: 750, y: GROUND_TOP - 60, patrolMin: 650, patrolMax: 850 },
+        { kind: 'drone', x: 1870, y: GROUND_TOP - 60, patrolMin: 1848, patrolMax: 1895, guardGroup: 'inner_hall' },
+        { kind: 'seeker', x: 1750, y: GROUND_TOP - 180, guardGroup: 'inner_hall' },
       ],
     },
     bossMechanics: {
@@ -187,11 +231,16 @@ export const LEVELS: Record<number, LevelConfig> = {
       hasLava: false,
       platforms: [
         { x: 640, y: 540, width: 240 },
-        // First collapsing surface — it is the only route across the pit.
+        // A convenience mid-crossing, not a requirement — both gaps below
+        // are directly jumpable at ground level (300px/320px, under the
+        // 408px single-jump budget), so a collapse never strands anyone.
         { x: 980, y: 510, width: 200, behaviour: 'collapsing' },
         { x: 1300, y: 486, width: 220 },
-        // A ferry across the widest gap in the realm.
+        // Route choice: the low ferry (safe, slow) vs the high ledge above
+        // it (air-jump only, faster, carries the bonus relic). Both cross
+        // the same gap; neither is mandatory.
         { x: 1640, y: 470, width: 200, behaviour: 'moving', travelX: 300, travelMs: 2600 },
+        { x: 1640, y: 360, width: 160 },
         { x: 2000, y: 500, width: 240 },
         // Arena
         { x: 2420, y: 496, width: 280 },
@@ -205,7 +254,17 @@ export const LEVELS: Record<number, LevelConfig> = {
       ],
       pickups: [
         { x: 1300, y: 420, type: 'hermes_step' },
+        // Reward for taking the high ledge over the ferry.
+        { x: 1640, y: 300, type: 'rune_of_ruin' },
         { x: 2000, y: 434, type: 'phoenix_core' },
+      ],
+      // A canyon that was previously unguarded: a drone holding the solid
+      // ground between the two chasms, and a seeker stationed near the
+      // ferry crossing so riding it (or taking the high ledge) means fighting
+      // at range mid-traversal rather than a free pass.
+      enemies: [
+        { kind: 'drone', x: 1200, y: GROUND_TOP - 60, patrolMin: 1140, patrolMax: 1280 },
+        { kind: 'seeker', x: 1640, y: 240 },
       ],
     },
     bossMechanics: {
@@ -267,6 +326,17 @@ export const LEVELS: Record<number, LevelConfig> = {
         { x: 1260, y: 414, type: 'aegis_olympus' },
         { x: 1900, y: 394, type: 'thunderheart' },
       ],
+      // Mostly ranged pressure here, deliberately: a melee drone chasing the
+      // player across the phasing bridges or the vertical lift risks knocking
+      // them into a gap mid-timing-puzzle, which is a different (unfair) kind
+      // of difficulty than "read the pattern." One drone sits on the single
+      // stretch of genuinely solid ground instead; seekers watch the two
+      // precision sections from range without closing in.
+      enemies: [
+        { kind: 'drone', x: 1150, y: GROUND_TOP - 60, patrolMin: 1080, patrolMax: 1380 },
+        { kind: 'seeker', x: 1550, y: 320 },
+        { kind: 'seeker', x: 1900, y: 280 },
+      ],
     },
     bossMechanics: {
       canFly: true,
@@ -326,6 +396,18 @@ export const LEVELS: Record<number, LevelConfig> = {
         { x: 1580, y: 430, type: 'phoenix_core' },
         { x: 1880, y: 386, type: 'rune_of_ruin' },
         { x: 2180, y: 434, type: 'overdrive_shard' },
+      ],
+      // The realm's own identity is "every mechanic layered" — enemy
+      // pressure layers the same way: two drones holding the two solid-
+      // ground stretches between the three gaps, and two seekers watching
+      // the phasing-bridge section and the final approach to the arena gate
+      // from range, same fairness rule as Frozen Observatory (ranged only
+      // near precision terrain, melee only on genuinely solid ground).
+      enemies: [
+        { kind: 'drone', x: 1150, y: GROUND_TOP - 60, patrolMin: 1090, patrolMax: 1330 },
+        { kind: 'drone', x: 1800, y: GROUND_TOP - 60, patrolMin: 1720, patrolMax: 1960 },
+        { kind: 'seeker', x: 1580, y: 300 },
+        { kind: 'seeker', x: 2340, y: 260 },
       ],
     },
     bossMechanics: {

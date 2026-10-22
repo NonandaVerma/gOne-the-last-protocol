@@ -101,7 +101,20 @@ export type StaticHazardKind =
   /** Beam between two emitters, cycling warn -> active -> cooldown. */
   | 'laser_gate'
   /** Ground patch that pulses dangerous on a cycle. */
-  | 'corruption_zone';
+  | 'corruption_zone'
+  /**
+   * Trigger-based, not cyclic: armed once the player crosses `triggerX`,
+   * then flashes a warning, slides shut, blocks/damages while sealed, and
+   * reopens after `holdMs` — never a permanent block. The "outrun the
+   * closing gate" tension beat.
+   */
+  | 'security_door'
+  /**
+   * Starts sealed and stays sealed until every enemy in `guardGroup` is
+   * defeated, then opens once, permanently. The "clear the defenders to
+   * breach the gate" encounter beat — progression-gated, not timed.
+   */
+  | 'locked_gate';
 
 export interface StaticHazardSpec {
   kind: StaticHazardKind;
@@ -115,6 +128,14 @@ export interface StaticHazardSpec {
   cooldownMs?: number;
   /** Offset into the cycle, so a row of gates fires in sequence. */
   offsetMs?: number;
+  /** `security_door` only: world X that arms the closing sequence once crossed. */
+  triggerX?: number;
+  /** `security_door` only: ms the seal animation takes once warning ends. */
+  closeMs?: number;
+  /** `security_door` only: ms the door stays sealed before reopening. */
+  holdMs?: number;
+  /** `locked_gate` only: the `EnemySpec.guardGroup` id that must be cleared. */
+  guardGroup?: string;
 }
 
 /** A relic placed deliberately rather than spawned at random. */
@@ -138,6 +159,8 @@ export interface EnemySpec {
   /** `drone` only: patrol bounds: it won't chase past these world X values. */
   patrolMin?: number;
   patrolMax?: number;
+  /** Enemies sharing an id are tracked together by a `locked_gate` guarding them. */
+  guardGroup?: string;
 }
 
 export interface ArenaGeometry {

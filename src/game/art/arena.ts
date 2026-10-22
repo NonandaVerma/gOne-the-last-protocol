@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { ACCENT, VILLAIN } from './palette';
-import { bolt, forge, path, poly, rand, seeded } from './draw';
+import { bandRect, bolt, forge, path, poly, rand, seeded } from './draw';
 import { buildAllRealms } from './realm';
 
 /**
@@ -77,6 +77,34 @@ export function buildArena(scene: Phaser.Scene) {
       const x = r() * 128;
       path(g, [{ x, y: 34 }, { x: x + rand(r, -6, 6), y: 6 + r() * 12 }], 0xff6678, 0.5, 1.4);
     }
+  });
+
+  // Security door panel — slides down from a fixed housing. Warning
+  // chevrons read as "industrial machinery," distinct from every other
+  // hazard's organic/energy language.
+  forge(scene, 'hazard_door_panel', 48, 220, (g) => {
+    bandRect(g, 0, 0, 48, 220, 0x2b3a4d, 0x111820, 20);
+    for (let y = 10; y < 220; y += 26) {
+      poly(
+        g,
+        [{ x: 6, y }, { x: 24, y: y + 10 }, { x: 42, y }, { x: 42, y: y + 4 }, { x: 24, y: y + 14 }, { x: 6, y: y + 4 }],
+        0xff243d,
+        0.55
+      );
+    }
+    g.lineStyle(2, 0x8395a5, 0.8);
+    g.strokeRect(2, 2, 44, 216);
+  });
+
+  // Door housing — the fixed frame the panel slides within.
+  forge(scene, 'hazard_door_housing', 56, 24, (g) => {
+    g.fillStyle(0x111820, 1);
+    g.fillRect(0, 0, 56, 24);
+    g.lineStyle(2, 0x8395a5, 0.9);
+    g.strokeRect(1, 1, 54, 22);
+    g.fillStyle(0xff243d, 1);
+    g.fillCircle(10, 12, 3);
+    g.fillCircle(46, 12, 3);
   });
 
   // Animated molten surface drawn under the ground lip in the fire realms.
