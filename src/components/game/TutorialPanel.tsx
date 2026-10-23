@@ -34,7 +34,7 @@ export const TutorialPanel: React.FC = () => {
       setTutorial(data);
       setVisible(true);
 
-      const duration = data.duration ?? 7500;
+      const duration = data.duration ?? 4500;
       timerRef.current = setTimeout(() => {
         setVisible(false);
       }, duration);
@@ -75,7 +75,7 @@ export const TutorialPanel: React.FC = () => {
   }, []);
 
   return (
-    <div className="absolute top-[168px] left-3 md:left-5 z-25 flex flex-col gap-2 max-w-[280px] pointer-events-none select-none">
+    <div className="absolute top-[74px] left-3 md:left-5 z-25 flex flex-col gap-1.5 max-w-[260px] pointer-events-none select-none">
       {/* Contextual interaction prompt when near an interactive object */}
       {interactionPrompt && (
         <div className="clip-notch border border-order-cyan bg-graphite/95 px-3 py-2 flex items-center gap-2 shadow-[0_0_15px_rgba(0,207,255,0.4)] animate-bounce-subtle">

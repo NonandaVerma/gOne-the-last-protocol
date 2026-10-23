@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Flame, Pause, Shield, Sparkles, Wind, Zap } from 'lucide-react';
 import { EventBus, GAME_EVENTS } from '../../game/systems/EventBus';
 import { ActiveRelicState } from '../../game/types/game';
+import { LevelState, LevelMetadata } from '../../game/systems/LevelState';
 import { SeamSigil } from '../ui/Seam';
 import { TutorialPanel } from './TutorialPanel';
 import { NarrationOverlay } from './NarrationOverlay';
@@ -20,7 +21,7 @@ interface CooldownInfo {
 const CoreUnits: React.FC<{
   current: number;
   max: number;
-  faction: 'order' | 'entropy';
+  faction: 'order' | 'entropy' | 'verdant';
 }> = ({ current, max, faction }) => (
   <div className="flex gap-1.5" role="img" aria-label={`${current} of ${max} units remaining`}>
     {Array.from({ length: max }).map((_, idx) => {
@@ -34,6 +35,8 @@ const CoreUnits: React.FC<{
             filled
               ? faction === 'order'
                 ? 'bg-gradient-to-b from-order-ice via-order-cyan to-order-blue border-order-cyan shadow-[0_0_10px_rgba(0,207,255,0.6)]'
+                : faction === 'verdant'
+                ? 'bg-gradient-to-b from-emerald-300 via-emerald-500 to-teal-800 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.6)]'
                 : 'bg-gradient-to-b from-entropy-hi via-entropy-crimson to-entropy-red border-entropy-crimson shadow-[0_0_10px_rgba(255,36,61,0.55)]'
               : 'bg-graphite/80 border-steel/20 opacity-40',
           ].join(' ')}
@@ -43,8 +46,14 @@ const CoreUnits: React.FC<{
   </div>
 );
 
+interface ContextualStatus {
+  label: string;
+  value: string;
+  alert?: boolean;
+}
+
 /* ------------------------------------------------------------------ */
-/* Ability cell — cooldown wipes downward as the ability recovers.     */
+/* Ability cell — compact, streamlined low-profile design.           */
 /* ------------------------------------------------------------------ */
 const AbilityCell: React.FC<{
   icon: React.ReactNode;
@@ -53,24 +62,36 @@ const AbilityCell: React.FC<{
   percent: number;
   active?: boolean;
   ready?: boolean;
-}> = ({ icon, label, binding, percent, active = false, ready = true }) => (
+  isLevel2?: boolean;
+  isLevel3?: boolean;
+}> = ({ icon, label, binding, percent, active = false, ready = true, isLevel2 = false, isLevel3 = false }) => (
   <div
     className={[
-      'relative overflow-hidden clip-notch border px-3 py-2 min-w-[108px]',
-      'flex items-center gap-2.5 transition-all duration-200',
+      'relative overflow-hidden clip-notch border px-2 py-1 min-w-[78px] md:min-w-[90px]',
+      'flex items-center gap-1.5 transition-all duration-200 backdrop-blur-xs',
       active
-        ? 'border-order-cyan bg-order-deep/90 shadow-[0_0_18px_-2px_rgba(0,207,255,0.7)]'
+        ? isLevel3
+          ? 'border-emerald-400 bg-emerald-950/80 shadow-[0_0_14px_-2px_rgba(16,185,129,0.7)]'
+          : isLevel2
+          ? 'border-entropy-crimson bg-entropy-deep/90 shadow-[0_0_14px_-2px_rgba(255,36,61,0.7)]'
+          : 'border-order-cyan bg-order-deep/90 shadow-[0_0_14px_-2px_rgba(0,207,255,0.7)]'
         : ready
-        ? 'border-steel/25 bg-graphite/85'
+        ? isLevel3
+          ? 'border-emerald-500/30 bg-graphite/80'
+          : isLevel2
+          ? 'border-entropy-crimson/25 bg-graphite/80'
+          : 'border-steel/25 bg-graphite/80'
         : 'border-steel/15 bg-graphite/60',
     ].join(' ')}
   >
-    <span className={active || ready ? 'text-order-cyan' : 'text-steel/50'}>{icon}</span>
-    <div className="flex flex-col leading-tight">
-      <span className="font-ui font-bold text-[0.7rem] tracking-[0.12em] uppercase text-paper">
+    <span className={active || ready ? (active && isLevel3 ? 'text-emerald-300' : active && isLevel2 ? 'text-entropy-crimson' : isLevel3 ? 'text-emerald-400' : 'text-order-cyan') : 'text-steel/40'}>
+      {icon}
+    </span>
+    <div className="flex flex-col leading-none">
+      <span className="font-ui font-bold text-[0.62rem] tracking-[0.1em] uppercase text-paper">
         {label}
       </span>
-      <span className="font-ui text-[0.6rem] tracking-wider text-muted/70">{binding}</span>
+      <span className="font-ui text-[0.52rem] tracking-wider text-muted/70">{binding}</span>
     </div>
 
     {/* Recovery wipe — shrinks as the cooldown drains */}
@@ -87,11 +108,9 @@ export const GameHUD: React.FC = () => {
   const [playerHealth, setPlayerHealth] = useState({ current: 3, max: 3 });
   const [bossHealth, setBossHealth] = useState({ current: 8, max: 8 });
   const [bossActive, setBossActive] = useState(false);
-  const [levelInfo, setLevelInfo] = useState({
-    level: 1,
-    name: 'SHATTERED SKIES',
-    subtitle: 'Realm I — The First Fracture',
-  });
+  const [bossPhase, setBossPhase] = useState<number>(1);
+  const [contextualStatus, setContextualStatus] = useState<ContextualStatus | null>(null);
+  const [levelInfo, setLevelInfo] = useState<LevelMetadata>(() => LevelState.get());
   const [overdrive, setOverdrive] = useState({ charge: 0, isActive: false });
   const [activeRelics, setActiveRelics] = useState<ActiveRelicState[]>([]);
   const [cooldowns, setCooldowns] = useState<{
@@ -109,6 +128,10 @@ export const GameHUD: React.FC = () => {
   });
 
   useEffect(() => {
+    // Initial sync with authoritative state on mount
+    setLevelInfo(LevelState.get());
+    EventBus.emit('request-level-sync');
+
     const handlePlayerHealth = (data: { current: number; max: number }) => setPlayerHealth(data);
     const handleBossHealth = (data: { current: number; max: number }) => {
       setBossHealth(data);
@@ -122,9 +145,19 @@ export const GameHUD: React.FC = () => {
         setBossActive(false);
       }
     };
+    const handleBossPhase = (data: { phase: number }) => {
+      if (data && typeof data.phase === 'number') {
+        setBossPhase(data.phase);
+      }
+    };
     const handleLevelLoaded = (data: { level: number; name: string; subtitle: string }) => {
+      LevelState.set(data);
       setLevelInfo(data);
       setBossActive(data.level > 1);
+      setContextualStatus(null);
+    };
+    const handleContextualStatus = (data: ContextualStatus | null) => {
+      setContextualStatus(data);
     };
     const handleOverdrive = (data: { charge: number; isActive: boolean }) => setOverdrive(data);
     const handleCooldowns = (data: any) => setCooldowns(data);
@@ -133,7 +166,9 @@ export const GameHUD: React.FC = () => {
     EventBus.on(GAME_EVENTS.PLAYER_HEALTH_CHANGED, handlePlayerHealth);
     EventBus.on(GAME_EVENTS.BOSS_HEALTH_CHANGED, handleBossHealth);
     EventBus.on(GAME_EVENTS.BOSS_STATE_CHANGED, handleBossState);
+    EventBus.on(GAME_EVENTS.BOSS_PHASE_CHANGED, handleBossPhase);
     EventBus.on(GAME_EVENTS.LEVEL_LOADED, handleLevelLoaded);
+    EventBus.on(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, handleContextualStatus);
     EventBus.on(GAME_EVENTS.OVERDRIVE_CHANGED, handleOverdrive);
     EventBus.on(GAME_EVENTS.COOLDOWNS_CHANGED, handleCooldowns);
     EventBus.on(GAME_EVENTS.ACTIVE_RELICS_CHANGED, handleActiveRelics);
@@ -142,7 +177,9 @@ export const GameHUD: React.FC = () => {
       EventBus.off(GAME_EVENTS.PLAYER_HEALTH_CHANGED, handlePlayerHealth);
       EventBus.off(GAME_EVENTS.BOSS_HEALTH_CHANGED, handleBossHealth);
       EventBus.off(GAME_EVENTS.BOSS_STATE_CHANGED, handleBossState);
+      EventBus.off(GAME_EVENTS.BOSS_PHASE_CHANGED, handleBossPhase);
       EventBus.off(GAME_EVENTS.LEVEL_LOADED, handleLevelLoaded);
+      EventBus.off(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, handleContextualStatus);
       EventBus.off(GAME_EVENTS.OVERDRIVE_CHANGED, handleOverdrive);
       EventBus.off(GAME_EVENTS.COOLDOWNS_CHANGED, handleCooldowns);
       EventBus.off(GAME_EVENTS.ACTIVE_RELICS_CHANGED, handleActiveRelics);
@@ -161,13 +198,19 @@ export const GameHUD: React.FC = () => {
   /** Last unit left on either side — drives the critical readouts. */
   const bossCritical = bossHealth.current === 1;
   const playerCritical = playerHealth.current === 1;
+  const isLevel2 = levelInfo.level === 2;
+  const isLevel3 = levelInfo.level === 3;
+
+  const bossTitle = isLevel3 ? 'The Worldseed Guardian' : isLevel2 ? 'The Last Warden' : 'Ra-One';
 
   return (
     <div className="absolute inset-0 pointer-events-none p-3 md:p-5 flex flex-col justify-between z-20 select-none">
       {/* ================= TOP ROW ================= */}
       <div className="w-full flex justify-between items-start gap-3">
         {/* ---- ORDER: G-One ---- */}
-        <div className="panel panel-order p-3 min-w-[220px] max-w-[280px] flex flex-col gap-2">
+        <div
+          className={`panel ${isLevel3 ? 'border-emerald-500/30' : isLevel2 ? 'border-entropy-crimson/30' : 'panel-order'} p-3 min-w-[220px] max-w-[280px] flex flex-col gap-2`}
+        >
           <div className="flex items-center justify-between gap-3">
             <span className="hud-label text-order-cyan flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-order-cyan animate-pulse" />
@@ -232,16 +275,52 @@ export const GameHUD: React.FC = () => {
 
         {/* ---- CENTRE: realm identity on the seam axis ---- */}
         <div className="flex flex-col items-center gap-1.5 shrink-0">
-          <div className="panel px-5 py-2 flex flex-col items-center gap-0.5">
+          <div
+            className={`panel px-5 py-2 flex flex-col items-center gap-0.5 ${
+              isLevel3
+                ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)] bg-graphite/90'
+                : isLevel2
+                ? 'border-entropy-crimson/40 shadow-[0_0_15px_rgba(255,36,61,0.2)]'
+                : ''
+            }`}
+          >
             <div className="flex items-center gap-2">
               <SeamSigil size={10} />
-              <span className="hud-label text-[0.56rem] text-muted/70">{levelInfo.subtitle}</span>
+              <span
+                className={`hud-label text-[0.56rem] ${
+                  isLevel3 ? 'text-emerald-300/80' : 'text-muted/70'
+                }`}
+              >
+                {levelInfo.subtitle}
+              </span>
               <SeamSigil size={10} />
             </div>
-            <span className="font-display font-bold text-[0.7rem] md:text-xs tracking-[0.18em] text-paper text-center">
+            <span
+              className={`font-display font-bold text-[0.7rem] md:text-xs tracking-[0.18em] text-center ${
+                isLevel3 ? 'text-emerald-100' : isLevel2 ? 'text-amber-100' : 'text-paper'
+              }`}
+            >
               {levelInfo.name}
             </span>
           </div>
+
+          {/* Contextual Status Indicator */}
+          {contextualStatus && (
+            <div
+              className={`clip-notch px-3 py-0.5 border text-[0.58rem] font-ui font-semibold tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 backdrop-blur-xs ${
+                contextualStatus.alert
+                  ? isLevel3
+                    ? 'bg-emerald-950/90 border-emerald-500 text-amber-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse'
+                    : 'bg-entropy-deep/85 border-entropy-crimson text-entropy-hi shadow-[0_0_12px_rgba(255,36,61,0.5)] animate-pulse'
+                  : isLevel3
+                  ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
+                  : 'bg-graphite/85 border-steel/30 text-amber-300'
+              }`}
+            >
+              <span className="text-muted/70 text-[0.52rem]">{contextualStatus.label}:</span>
+              <span className="font-bold">{contextualStatus.value}</span>
+            </div>
+          )}
 
           <button
             onClick={handlePause}
@@ -253,9 +332,13 @@ export const GameHUD: React.FC = () => {
           </button>
         </div>
 
-        {/* ---- ENTROPY: Ra-One (shown when boss is active/engaged) ---- */}
+        {/* ---- ENTROPY / VERDANT: Ra-One / Last Warden / Worldseed Guardian ---- */}
         <div
-          className={`panel panel-entropy p-3 min-w-[220px] max-w-[280px] flex flex-col gap-2 transition-all duration-500 ${
+          className={`panel ${
+            isLevel3
+              ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
+              : 'panel-entropy'
+          } p-3 min-w-[220px] max-w-[280px] flex flex-col gap-2 transition-all duration-500 ${
             bossActive ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'
           }`}
         >
@@ -263,20 +346,51 @@ export const GameHUD: React.FC = () => {
             <span className="font-ui text-[0.68rem] font-bold tabular-nums text-steel">
               {bossHealth.current}/{bossHealth.max}
             </span>
-            <span className="hud-label text-entropy-crimson flex items-center gap-1.5">
-              Ra-One
-              <span className="w-1.5 h-1.5 rounded-full bg-entropy-crimson animate-pulse" />
+            <span
+              className={`hud-label flex items-center gap-1.5 ${
+                isLevel3 ? 'text-emerald-400' : 'text-entropy-crimson'
+              }`}
+            >
+              {bossTitle}
+              <span
+                className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                  isLevel3 ? 'bg-emerald-400' : 'bg-entropy-crimson'
+                }`}
+              />
             </span>
           </div>
 
-          <CoreUnits current={bossHealth.current} max={bossHealth.max} faction="entropy" />
+          <CoreUnits
+            current={bossHealth.current}
+            max={bossHealth.max}
+            faction={isLevel3 ? 'verdant' : 'entropy'}
+          />
 
-          <div className="text-right hud-label text-[0.54rem]">
-            {bossCritical ? (
-              <span className="text-entropy-crimson animate-pulse">Core Destabilised</span>
+          <div className="flex items-center justify-between hud-label text-[0.54rem]">
+            {isLevel3 ? (
+              <span className="text-emerald-300/80">Deity Core</span>
+            ) : isLevel2 ? (
+              <span className="text-entropy-crimson/80">Phase {bossPhase}</span>
             ) : (
-              <span className="text-muted/60">Corruption Active</span>
+              <span className="text-muted/60">Anomalous</span>
             )}
+            <div className="text-right">
+              {bossCritical ? (
+                <span
+                  className={
+                    isLevel3
+                      ? 'text-amber-400 animate-pulse'
+                      : 'text-entropy-crimson animate-pulse'
+                  }
+                >
+                  {isLevel3 ? 'Containment Collapsing' : 'Core Destabilised'}
+                </span>
+              ) : (
+                <span className="text-muted/60">
+                  {isLevel3 ? 'Overgrowth Active' : 'Corruption Active'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -288,39 +402,59 @@ export const GameHUD: React.FC = () => {
       <NarrationOverlay />
 
       {/* ================= ABILITY RAIL ================= */}
-      <div className="w-full flex justify-center items-end gap-2 flex-wrap pb-1">
+      <div className="w-full flex justify-center items-end gap-1.5 flex-wrap pb-1">
         <AbilityCell
-          icon={<Zap className="w-4 h-4" />}
+          icon={<Zap className="w-3.5 h-3.5" />}
           label="Pulse"
           binding="LMB / J"
           percent={cdPercent(cooldowns.pulseShot)}
+          isLevel2={isLevel2}
+          isLevel3={isLevel3}
         />
         <AbilityCell
-          icon={<Shield className="w-4 h-4" />}
+          icon={<Shield className="w-3.5 h-3.5" />}
           label="Aegis"
           binding="RMB / K"
           percent={cdPercent(cooldowns.aegisShield)}
           active={cooldowns.aegisShield.active}
+          isLevel2={isLevel2}
+          isLevel3={isLevel3}
         />
         <AbilityCell
-          icon={<Sparkles className="w-4 h-4" />}
+          icon={<Sparkles className="w-3.5 h-3.5" />}
           label="Arc Burst"
           binding="L"
           percent={cdPercent(cooldowns.arcBurst)}
+          isLevel2={isLevel2}
+          isLevel3={isLevel3}
         />
         <AbilityCell
-          icon={<Wind className="w-4 h-4" />}
+          icon={<Wind className="w-3.5 h-3.5" />}
           label="Phase Dash"
           binding="Shift"
           percent={cdPercent(cooldowns.dash)}
+          isLevel2={isLevel2}
+          isLevel3={isLevel3}
         />
+        {isLevel3 && (
+          <AbilityCell
+            icon={<span className="text-emerald-400 font-bold text-xs">◈</span>}
+            label="Rootline"
+            binding="F / Click"
+            percent={0}
+            ready={true}
+            isLevel3={true}
+          />
+        )}
         <AbilityCell
-          icon={<Flame className="w-4 h-4" />}
+          icon={<Flame className="w-3.5 h-3.5" />}
           label="Overdrive"
           binding="E"
           percent={0}
           ready={overdriveReady}
           active={overdrive.isActive}
+          isLevel2={isLevel2}
+          isLevel3={isLevel3}
         />
       </div>
     </div>

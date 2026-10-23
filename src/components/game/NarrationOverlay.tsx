@@ -12,15 +12,23 @@ export interface SubtitlePayload {
 }
 
 /**
- * Dedicated, centralized narration & subtitle presentation system.
+ * Dedicated, centralized narration & subtitle presentation system — the only
+ * one. (A second, Phaser-canvas-rendered path used to exist as `Juice.taunt()`
+ * for boss/objective lines, with its own hardcoded font string and its own
+ * bottom-anchored position; it rendered inconsistently with this component's
+ * next/font-loaded Rajdhani and physically stacked on top of it and the
+ * ability bar. All of it now routes through here instead.)
  *
  * Enforces:
- * - Pure white text (#FFFFFF) matching cinematic trailer presentation.
- * - Strong dual text-shadow + subtle dark backing for 100% legibility over any background.
+ * - White body text with a speaker tag coloured by faction (RA-ONE crimson,
+ *   G-ONE cyan, anything else neutral steel) — same two-colour language as
+ *   the rest of the UI, no third accent.
+ * - Strong dual text-shadow + subtle dark backing for legibility over any background.
  * - Single-active subtitle rule (no overlapping text or stacked lines).
  * - Priority queue & duplicate event suppression.
  * - Clean fade-in and fade-out transitions.
- * - Reserved lower-center safe area positioned cleanly above the ability bar.
+ * - Positioned in the upper third, clear of the ability bar and the rest of
+ *   the lower screen where gameplay actually happens.
  */
 export const NarrationOverlay: React.FC = () => {
   const [current, setCurrent] = useState<SubtitlePayload | null>(null);
@@ -53,14 +61,14 @@ export const NarrationOverlay: React.FC = () => {
     setCurrent(next);
     setVisible(true);
 
-    const duration = next.duration ?? Math.max(3000, next.text.length * 65);
+    const duration = next.duration ?? Math.min(4200, Math.max(2600, next.text.length * 48));
 
     timerRef.current = setTimeout(() => {
       setVisible(false);
       fadeTimerRef.current = setTimeout(() => {
         setCurrent(null);
         displayNext();
-      }, 350);
+      }, 250);
     }, duration);
   }, []);
 
@@ -97,7 +105,7 @@ export const NarrationOverlay: React.FC = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
       setVisible(false);
-      fadeTimerRef.current = setTimeout(() => setCurrent(null), 300);
+      fadeTimerRef.current = setTimeout(() => setCurrent(null), 250);
     };
 
     const handleStateReset = () => {
@@ -122,28 +130,38 @@ export const NarrationOverlay: React.FC = () => {
 
   if (!current && !visible) return null;
 
+  const speaker = current?.speaker?.toUpperCase();
+  const speakerTone =
+    speaker === 'RA-ONE'
+      ? 'text-entropy-hi border-entropy-crimson/30'
+      : speaker === 'G-ONE'
+      ? 'text-order-ice border-order-cyan/30'
+      : 'text-steel border-steel/20';
+
   return (
     <div
-      className="absolute inset-x-0 bottom-[96px] md:bottom-[88px] flex justify-center px-4 md:px-8 pointer-events-none z-30 select-none"
+      className="absolute inset-x-0 top-[70px] md:top-[74px] flex justify-center px-4 pointer-events-none z-30 select-none"
       aria-live="polite"
     >
       <div
-        className={`max-w-2xl px-5 py-2.5 rounded-sm bg-obsidian/85 border border-white/10 backdrop-blur-sm transition-all duration-300 transform flex flex-col items-center gap-1 ${
-          visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-98'
+        className={`max-w-xl px-4 py-1.5 clip-notch bg-obsidian/80 border border-white/10 backdrop-blur-xs transition-all duration-300 transform flex flex-col items-center gap-0.5 ${
+          visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-2 scale-98'
         }`}
         style={{
-          boxShadow: '0 4px 20px rgba(0,0,0,0.85), inset 0 0 12px rgba(0,0,0,0.5)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.85), inset 0 0 8px rgba(0,0,0,0.4)',
         }}
       >
         {current?.speaker && (
-          <span className="font-ui text-[0.65rem] tracking-[0.2em] font-bold uppercase text-order-ice/90 drop-shadow">
+          <span
+            className={`font-ui text-[0.58rem] tracking-[0.18em] font-bold uppercase border-b pb-0.5 ${speakerTone}`}
+          >
             [ {current.speaker} ]
           </span>
         )}
         <p
-          className="font-ui font-medium text-sm md:text-base lg:text-lg text-center tracking-wide text-white leading-snug drop-shadow-md"
+          className="font-ui font-medium text-xs md:text-sm text-center tracking-wide text-white leading-tight drop-shadow-md"
           style={{
-            textShadow: '0 2px 10px rgba(0,0,0,0.95), 0 1px 3px rgba(0,0,0,1)',
+            textShadow: '0 2px 8px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,1)',
           }}
         >
           {current?.text}

@@ -290,7 +290,7 @@ export class StaticHazardField {
     this.owned.push(housing);
 
     const panel = this.scene.physics.add.sprite(spec.x, closedY, 'hazard_door_panel');
-    panel.setDisplaySize(spec.width, height).setDepth(16).setTint(0xffb347);
+    panel.setDisplaySize(spec.width, height).setDepth(16).setTint(0xff243d);
 
     const body = panel.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);

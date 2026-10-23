@@ -49,18 +49,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
   const [revealLevel, setRevealLevel] = useState<number | null>(null);
   const startedRef = useRef(false);
 
-  /* Client-only state: read after mount so the server render stays stable. */
-  useEffect(() => {
-    setMounted(true);
-    setIsMuted(AudioManager.getInstance().isMuted());
-    setUnlockedLevel(SaveManager.getUnlockedLevel());
-    setIsFullscreen(Boolean(document.fullscreenElement));
-
-    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
-
   /** Charge the dimensional seam, then hand off to the existing Phaser flow. */
   const proceedToGame = useCallback((level: number, immediate = false) => {
     const reduced =
@@ -99,6 +87,28 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
 
     proceedToGame(level);
   }, [proceedToGame]);
+
+  /* Client-only state: read after mount so the server render stays stable. */
+  useEffect(() => {
+    setMounted(true);
+    setIsMuted(AudioManager.getInstance().isMuted());
+    const savedLevel = SaveManager.getUnlockedLevel();
+    setUnlockedLevel(savedLevel);
+    setIsFullscreen(Boolean(document.fullscreenElement));
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const lvlParam = parseInt(params.get('level') ?? '', 10);
+      if (lvlParam >= 1 && lvlParam <= 6) {
+        SaveManager.saveUnlockedLevel(Math.max(savedLevel, lvlParam));
+        setUnlockedLevel(Math.max(savedLevel, lvlParam));
+      }
+    } catch (_) {}
+
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, [initiate]);
 
   const handleRevealFinish = useCallback(() => {
     const level = revealLevel ?? 1;

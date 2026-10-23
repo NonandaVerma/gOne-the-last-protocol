@@ -13,6 +13,7 @@ import { VictoryScreen } from '../components/game/VictoryScreen';
 import { TouchControls } from '../components/game/TouchControls';
 import { StageBanner } from '../components/game/StageBanner';
 import { IntroCinematic } from '../components/game/IntroCinematic';
+import { LevelRevealCinematic } from '../components/game/LevelRevealCinematic';
 
 /** Session-scoped: the cinematic replays on a fresh browser session only. */
 const INTRO_KEY = 'gone_intro_played_v1';
@@ -40,9 +41,15 @@ export default function Home() {
    * never replays it, but a new session does.
    */
   const [showIntro, setShowIntro] = useState(false);
+  const [revealLevel, setRevealLevel] = useState<number | null>(null);
 
   useEffect(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('autoplay') === 'true' || params.get('skipIntro') === 'true') {
+        setShowIntro(false);
+        return;
+      }
       if (!sessionStorage.getItem(INTRO_KEY)) setShowIntro(true);
     } catch {
       /* storage unavailable (private mode) — skip straight to the menu */
@@ -54,12 +61,28 @@ export default function Home() {
       setGameState(state);
     };
 
+    const handlePlayReveal = (data: { level: number }) => {
+      if (data?.level) {
+        setRevealLevel(data.level);
+      }
+    };
+
     EventBus.on(GAME_EVENTS.GAME_STATE_CHANGED, handleStateChange);
+    EventBus.on('play-realm-reveal', handlePlayReveal);
 
     return () => {
       EventBus.off(GAME_EVENTS.GAME_STATE_CHANGED, handleStateChange);
+      EventBus.off('play-realm-reveal', handlePlayReveal);
     };
   }, []);
+
+  const handleRevealFinish = () => {
+    const nextLvl = revealLevel;
+    setRevealLevel(null);
+    if (nextLvl) {
+      EventBus.emit('realm-reveal-finished', { level: nextLvl });
+    }
+  };
 
   const handleIntroFinish = () => {
     try {
@@ -118,6 +141,14 @@ export default function Home() {
       {/* 4. Opening cinematic — the single startup sequence, above everything
              until it is skipped or plays out. */}
       {showIntro && <IntroCinematic onFinish={handleIntroFinish} />}
+
+      {/* 5. In-game Realm Reveal Cinematic — plays during realm progression */}
+      {revealLevel !== null && (
+        <LevelRevealCinematic
+          level={revealLevel}
+          onFinish={handleRevealFinish}
+        />
+      )}
     </main>
   );
 }

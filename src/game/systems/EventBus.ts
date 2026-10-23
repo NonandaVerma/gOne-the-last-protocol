@@ -109,6 +109,7 @@ export const GAME_EVENTS = {
   SHOW_TUTORIAL: 'show-tutorial',
   HIDE_TUTORIAL: 'hide-tutorial',
   INTERACTION_PROMPT: 'interaction-prompt',
+  CONTEXTUAL_STATUS_CHANGED: 'contextual-status-changed',
 
   // Input triggers from React UI (e.g. mobile virtual buttons or HUD clicks)
   TRIGGER_MOVE_LEFT: 'trigger-move-left',

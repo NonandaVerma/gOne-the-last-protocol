@@ -3,48 +3,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, SkipForward, Volume2, VolumeX } from 'lucide-react';
 
-interface Cue {
-  from: number;
-  to: number;
-  text: string;
-}
+import {
+  REALM_REVEALS,
+  getRealmReveal,
+  type RealmRevealConfig as RealmReveal,
+  type RevealCue as Cue,
+} from '../../game/data/story';
 
-interface RealmReveal {
-  video: string;
-  /** Optional narrative cues, as fractions of the real video duration. */
-  cues?: Cue[];
-}
-
-/**
- * PER-REALM REVEAL VIDEOS.
- *
- * Keyed by realm id. A realm with no entry here is simply skipped by
- * `getRealmReveal` — the caller never mounts this component for it, so
- * realms 2-6 proceed straight to gameplay until their own footage exists.
- *
- * Cue text is a light placeholder translated into the Order-vs-Entropy
- * vocabulary (no mythology framing, matching the rest of the UI). The video
- * itself carries the title card at the end, so no closing title line is
- * duplicated here. Exact timing is unverified — no video inspection tool is
- * available in this environment — so cues are spread evenly across the
- * timeline; adjust `from`/`to` (0-1 fractions of duration) once reviewed
- * against the actual footage.
- */
-const REALM_REVEALS: Record<number, RealmReveal> = {
-  1: {
-    video: '/images/level1_reveal.mp4',
-    cues: [
-      { from: 0.05, to: 0.22, text: 'The Heart Crystal has fractured. Reality is next.' },
-      { from: 0.28, to: 0.46, text: 'A guardian wakes with no memory of the war that made him.' },
-      { from: 0.52, to: 0.7, text: 'What corrupted the sanctuary still moves within it.' },
-      { from: 0.76, to: 0.92, text: 'The first fragment of the Protocol waits ahead.' },
-    ],
-  },
-};
-
-export function getRealmReveal(level: number): RealmReveal | undefined {
-  return REALM_REVEALS[level];
-}
+export { getRealmReveal, REALM_REVEALS, type RealmReveal, type Cue };
 
 interface LevelRevealCinematicProps {
   level: number;
@@ -110,7 +76,16 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
       .catch((err: unknown) => {
         const name = (err as { name?: string })?.name;
         if (name === 'NotAllowedError' || name === 'AbortError') {
-          setPhase('needs-gesture');
+          // If audible autoplay is blocked by browser policy, play muted immediately so footage and subtitles roll
+          v.muted = true;
+          v.play()
+            .then(() => {
+              setPhase('playing');
+              setMuted(true);
+            })
+            .catch(() => {
+              setPhase('needs-gesture');
+            });
         } else {
           setPhase('error');
         }
@@ -139,7 +114,14 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
       setMuted(false);
       setPhase('playing');
     } catch {
-      setPhase('error');
+      try {
+        v.muted = true;
+        await v.play();
+        setMuted(true);
+        setPhase('playing');
+      } catch {
+        setPhase('error');
+      }
     }
   };
 

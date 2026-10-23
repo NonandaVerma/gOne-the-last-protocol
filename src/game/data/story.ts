@@ -53,32 +53,32 @@ export const OPENING_STORY: StorySlide[] = [
 
 export const LEVEL_2_TRANSITION: StorySlide = {
   id: 'transition-l2',
-  title: 'THE RUINED CITADEL',
-  subtitle: 'CHAPTER II — FALLEN METROPOLIS',
+  title: 'INFERNAL FORTRESS',
+  subtitle: 'CHAPTER II — SIX SECTORS OF FIRE & IRON',
   text: [
-    'The volcanic vanguard has crumbled, yet the destroyer endures.',
-    'Ra-One has ascended to the spires of the shattered metropolis.',
-    'Beware the falling debris and the fury of his aerial barrage.',
+    'The sky-fortress has fallen behind you into volcanic ruin.',
+    'Ra-One has entrenched his legions within the Infernal Fortress.',
+    'Traverse the fractured bridge, breach the citadel, and silence The Last Warden.',
   ],
-  speaker: 'NARRATOR',
+  speaker: 'SYSTEM',
   visualCues: {
-    skyColor: '#0a0d18',
+    skyColor: '#140305',
     lightning: 'red',
   },
 };
 
 export const LEVEL_3_TRANSITION: StorySlide = {
   id: 'transition-l3',
-  title: 'THE FINAL DIVINE RECKONING',
-  subtitle: 'CHAPTER III — THE ZERO-DAY ABYSS  //  ONE HIT DECIDES',
+  title: 'THE VERDANT ABYSS',
+  subtitle: 'CHAPTER III — THE BIOMECHANICAL BIOSPHERE',
   text: [
-    'The boundary between Olympus and the abyss has shattered.',
-    'All mortal armor is stripped bare. Only pure divine spirit remains.',
-    'A single decisive blow will dictate whether light survives or darkness rules.',
+    'The Infernal Fortress crumbles into scorched ash behind you.',
+    'Beyond lies the Verdant Abyss — where alien technology and colossal roots intertwine.',
+    'Traverse the living canopy, breach the Colossus, and confront The Worldseed Guardian.',
   ],
   speaker: 'SYSTEM',
   visualCues: {
-    skyColor: '#02020a',
+    skyColor: '#031d17',
     lightning: 'blue',
   },
 };
@@ -87,18 +87,18 @@ export const LEVEL_3_TRANSITION: StorySlide = {
  * Narration shown when entering each realm after the first.
  *
  * Keyed by the realm being entered, so `REALM_TRANSITIONS[3]` plays on the way
- * into Void Canyons. One world degrading, not six unrelated places.
+ * into The Verdant Abyss. One world degrading, not six unrelated places.
  */
 export const REALM_TRANSITIONS: Record<number, string[]> = {
   2: [
     'THE SKY-FORTRESS HAS FALLEN BEHIND YOU.',
-    'WHAT BURNS AHEAD WAS ONCE THE SAME STONE.',
-    'THE CORRUPTION HAS LEARNED TO SPREAD.',
+    'CONSECRATED IRON AND VOLCANIC STONE ENGULF THE REALM.',
+    'SIX SECTORS OF CORRUPTION BAR YOUR PATH TO THE WARDEN.',
   ],
   3: [
-    'THE PROTOCOL NO LONGER HOLDS THE BOUNDARY.',
-    'MATTER AND CODE BLEED INTO ONE ANOTHER.',
-    'NOTHING HERE WILL STAY BENEATH YOUR FEET.',
+    'THE LAST WARDEN IS EXTINGUISHED.',
+    'ENTERING REALM III — THE VERDANT ABYSS.',
+    'BIOMECHANICAL ROOTS AWAKEN ACROSS SIX LIVING SECTORS.',
   ],
   4: [
     'BEYOND THE RIFT, A FRAGMENT OF ORDER SURVIVES.',
@@ -130,3 +130,41 @@ export const VICTORY_STORY = {
   mainTitle: 'LIGHT SURVIVES',
   lore: 'WITH ZEUS’S WRATH AND ATHENA’S AEGIS, G-ONE SHATTERS THE CORRUPT ESSENCE OF RA-ONE. THE REALM IS RENEWED IN RADIANT GLORY.',
 };
+
+export interface RevealCue {
+  from: number;
+  to: number;
+  text: string;
+}
+
+export interface RealmRevealConfig {
+  video: string;
+  cues?: RevealCue[];
+}
+
+export const REALM_REVEALS: Record<number, RealmRevealConfig> = {
+  1: {
+    video: '/images/level1_reveal.mp4',
+    cues: [
+      { from: 0.05, to: 0.22, text: 'The Heart Crystal has fractured. Reality is next.' },
+      { from: 0.28, to: 0.46, text: 'A guardian wakes with no memory of the war that made him.' },
+      { from: 0.52, to: 0.7, text: 'What corrupted the sanctuary still moves within it.' },
+      { from: 0.76, to: 0.92, text: 'The first fragment of the Protocol waits ahead.' },
+    ],
+  },
+  2: {
+    video: '/images/level2-reveal.mp4',
+    cues: [
+      { from: 0.04, to: 0.18, text: "The skyway falls away. Beyond the fracture lies the burning crucible of Ra-One's domain." },
+      { from: 0.22, to: 0.38, text: "Infernal Fortress—consecrated to entropy, forged of volcanic iron and molten fire." },
+      { from: 0.42, to: 0.58, text: "Deep inside, a corrupted dimensional reactor fractures the bedrock of reality." },
+      { from: 0.62, to: 0.78, text: "At the threshold of the inner sanctum, The Last Warden awakens." },
+      { from: 0.82, to: 0.96, text: "Breach the citadel. Stabilize the core. Enter Realm II — INFERNAL FORTRESS." },
+    ],
+  },
+};
+
+export function getRealmReveal(level: number): RealmRevealConfig | undefined {
+  return REALM_REVEALS[level];
+}
+

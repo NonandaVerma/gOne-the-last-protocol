@@ -5,7 +5,7 @@ import { EventBus, GAME_EVENTS } from '../../game/systems/EventBus';
 import { SeamSigil } from '../ui/Seam';
 
 /** How long a stage announcement stays on screen before fading out. */
-const VISIBLE_MS = 3400;
+const VISIBLE_MS = 2800;
 
 /**
  * Brief, readable confirmation that a realm's internal stage has advanced.
@@ -38,7 +38,7 @@ export const StageBanner: React.FC = () => {
 
   return (
     <div
-      className="absolute inset-x-0 top-[14%] flex justify-center pointer-events-none z-25 select-none"
+      className="absolute inset-x-0 top-[64px] flex justify-center pointer-events-none z-25 select-none"
       aria-live="polite"
     >
       <div

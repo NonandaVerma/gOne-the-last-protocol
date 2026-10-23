@@ -42,11 +42,29 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('bg_realm1_stage4', '/images/level1-stage4.png'); // The Corrupted Guardian
     this.load.image('bg_realm1_stage5', '/images/level1-stage5.png'); // Protocol Fragment
 
-    this.load.image('bg_realm2', '/images/bg_level1.png');    // Infernal Fortress
-    this.load.image('bg_realm3', '/images/bg_defeat.png');    // Vortex Over Floating Ruins
+    /* Realm 2's six-stage internal progression (The Divide Approach -> The Crimson Citadel ->
+       The Fracture Core -> The Entropy Vault -> The Entropy Nexus -> The Last Warden). */
+    this.load.image('bg_realm2', '/images/level2-stage1.png');        // Infernal Fortress default
+    this.load.image('bg_realm2_stage1', '/images/level2-stage1.png'); // The Divide Approach
+    this.load.image('bg_realm2_stage2', '/images/level2-stage2.png'); // The Crimson Citadel
+    this.load.image('bg_realm2_stage3', '/images/level2-stage3.png'); // The Fracture Core
+    this.load.image('bg_realm2_stage4', '/images/level2-stage4.png'); // The Entropy Vault
+    this.load.image('bg_realm2_stage5', '/images/level2-stage5.png'); // The Entropy Nexus
+    this.load.image('bg_realm2_stage6', '/images/level2-stage6.jpg'); // The Last Warden
+
+    /* Realm 3's six-stage internal progression (The Living Threshold -> The Verdant Wilds ->
+       The Hollow Colossus -> The Heartroot Sanctuary -> The Biosphere Crucible -> The Worldseed Guardian). */
+    this.load.image('bg_realm3', '/images/level3-stage1.png');        // The Verdant Abyss default
+    this.load.image('bg_realm3_stage1', '/images/level3-stage1.png'); // The Living Threshold
+    this.load.image('bg_realm3_stage2', '/images/level3-stage2.png'); // The Verdant Wilds
+    this.load.image('bg_realm3_stage3', '/images/level3-stage3.png'); // The Hollow Colossus
+    this.load.image('bg_realm3_stage4', '/images/level3-stage4.png'); // The Heartroot Sanctuary
+    this.load.image('bg_realm3_stage5', '/images/level3-stage5.png'); // The Biosphere Crucible
+    this.load.image('bg_realm3_stage6', '/images/level-3-stage6.png'); // The Worldseed Guardian
+
     this.load.image('bg_realm4', '/images/bg_realm4.png');    // Moonlit Citadel of the Frozen Sky
     this.load.image('bg_realm5', '/images/bg_victory.png');   // Celestial Forest Sanctuary
-    this.load.image('bg_realm6', '/images/bg_level3.png');    // Crimson Rift: The Final Arena
+    this.load.image('bg_realm6', '/images/Six Realms of the Shattered Protocol.png'); // Final Arena
 
     this.load.on('progress', (value: number) => {
       progressBar.clear();

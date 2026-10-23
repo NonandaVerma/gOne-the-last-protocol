@@ -60,6 +60,42 @@ const KIND_CONFIG: Record<EnemyKind, KindConfig> = {
     contactDamage: 1,
     attackCooldownMs: 1800,
   },
+  rootstalker: {
+    frame: ENEMY_FRAME.rootstalker,
+    health: 3,
+    speed: 190,
+    detectRange: 440,
+    engageRange: 70,
+    contactDamage: 1,
+    attackCooldownMs: 1300,
+  },
+  sporecaster: {
+    frame: ENEMY_FRAME.sporecaster,
+    health: 3,
+    speed: 0,
+    detectRange: 560,
+    engageRange: 500,
+    contactDamage: 1,
+    attackCooldownMs: 2200,
+  },
+  canopy_hunter: {
+    frame: ENEMY_FRAME.canopy_hunter,
+    health: 2,
+    speed: 160,
+    detectRange: 480,
+    engageRange: 220,
+    contactDamage: 1,
+    attackCooldownMs: 1600,
+  },
+  guardian_organism: {
+    frame: ENEMY_FRAME.guardian_organism,
+    health: 5,
+    speed: 95,
+    detectRange: 400,
+    engageRange: 80,
+    contactDamage: 2,
+    attackCooldownMs: 2000,
+  },
 };
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
@@ -243,8 +279,22 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.facing = Math.sign(target.x - this.x) || this.facing;
         this.setFlipX(this.facing > 0);
 
-        if (this.kind === 'drone') {
+        if (this.kind === 'drone' || this.kind === 'rootstalker' || this.kind === 'guardian_organism') {
           if (distToTarget > this.cfg.engageRange) {
+            body.setVelocityX(this.facing * this.cfg.speed);
+          } else {
+            body.setVelocityX(0);
+            if (time >= this.nextAttackAt) this.beginTelegraph();
+          }
+        } else if (this.kind === 'sporecaster') {
+          // Stationary turret pod
+          body.setVelocity(0, 0);
+          if (distToTarget <= this.cfg.engageRange) {
+            if (time >= this.nextAttackAt) this.beginTelegraph();
+          }
+        } else if (this.kind === 'canopy_hunter') {
+          // Arboreal predator hovering/patrolling high
+          if (distToTarget > this.cfg.engageRange + 60) {
             body.setVelocityX(this.facing * this.cfg.speed);
           } else {
             body.setVelocityX(0);
@@ -262,7 +312,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           }
         }
 
-        if (distToTarget > this.cfg.detectRange * 1.4) this.transitionTo('idle');
+        if (distToTarget > this.cfg.detectRange * 1.5) this.transitionTo('idle');
         break;
       }
 
@@ -270,7 +320,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         body.setVelocityX(0);
         // A slow brightening scale reads as "about to act" independent of colour.
         const t = 1 - (this.stateUntil - time) / TELEGRAPH_MS;
-        this.setScale(1 + Math.min(1, Math.max(0, t)) * 0.12);
+        this.setScale(1 + Math.min(1, Math.max(0, t)) * 0.14);
         if (time >= this.stateUntil) this.commitAttack();
         break;
       }
@@ -299,20 +349,79 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   private beginTelegraph() {
     this.transitionTo('telegraph', TELEGRAPH_MS);
-    this.setTint(VILLAIN.rim);
+    const tint = this.kind === 'rootstalker' || this.kind === 'sporecaster' ? 0x10b981 : VILLAIN.rim;
+    this.setTint(tint);
     this.scene.time.delayedCall(TELEGRAPH_MS, () => {
       if (this.active) this.clearTint();
     });
   }
 
   private commitAttack() {
-    this.transitionTo('attack', 220);
+    this.transitionTo('attack', 260);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+
     if (this.kind === 'drone') {
-      const body = this.body as Phaser.Physics.Arcade.Body;
       body.setVelocityX(this.facing * this.cfg.speed * 2.2);
+    } else if (this.kind === 'rootstalker') {
+      body.setVelocityX(this.facing * this.cfg.speed * 2.6);
+      body.setVelocityY(-180);
+      AudioManager.getInstance().playDash();
+    } else if (this.kind === 'sporecaster') {
+      this.fireSporeMortar();
+    } else if (this.kind === 'canopy_hunter') {
+      body.setVelocity(this.facing * 340, 240);
+      AudioManager.getInstance().playDash();
+    } else if (this.kind === 'guardian_organism') {
+      this.slamShockwave();
     } else {
       this.fireAtTarget();
     }
+  }
+
+  private fireSporeMortar() {
+    if (!this.target || !this.projectiles) return;
+    const dx = this.target.x - this.x;
+    const dy = this.target.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    // Calculated launch velocity for a high arcing mortar
+    const speed = Math.min(540, Math.max(340, dist * 0.95));
+    const angle = Math.atan2(dy - 140, dx);
+
+    spawnProjectile(this.projectiles, {
+      x: this.x,
+      y: this.y - 20,
+      texture: 'proj_spore_mortar',
+      speed,
+      angle,
+      damage: this.cfg.contactDamage,
+      owner: 'boss',
+      gravityY: 340,
+      lifespan: 3000,
+      scale: 1.2,
+    });
+    AudioManager.getInstance().playRaOneShoot();
+  }
+
+  private slamShockwave() {
+    this.juice.shake(0.012, 280);
+    this.juice.impact(this.x, this.y + 24, 'boss', { scale: 1.6, sparks: 16 });
+    AudioManager.getInstance().playExplosion();
+
+    if (!this.projectiles) return;
+    // Emit two shockwave bursts left and right
+    [-1, 1].forEach((dir) => {
+      spawnProjectile(this.projectiles!, {
+        x: this.x + dir * 28,
+        y: this.y + 20,
+        texture: 'proj_raone_bolt',
+        speed: 360,
+        angle: dir > 0 ? 0 : Math.PI,
+        damage: this.cfg.contactDamage,
+        owner: 'boss',
+        lifespan: 1400,
+        scale: 1.3,
+      });
+    });
   }
 }
 

@@ -7,7 +7,7 @@ import { StaticHazardField } from '../entities/StaticHazard';
 import { DynamicPlatformManager } from '../entities/DynamicPlatform';
 import { Enemy, EnemyManager } from '../entities/Enemy';
 import { LEVELS, VIEW_W, VIEW_H } from '../data/levels';
-import { REALM_TRANSITIONS } from '../data/story';
+import { REALM_TRANSITIONS, getRealmReveal } from '../data/story';
 import { AudioManager } from '../systems/AudioManager';
 import { SaveManager } from '../systems/SaveManager';
 import { Juice } from '../systems/Juice';
@@ -16,6 +16,10 @@ import { EventBus, GAME_EVENTS } from '../systems/EventBus';
 import { HERO, VILLAIN } from '../art/palette';
 import { ArenaGeometry, LevelConfig, REALM_COUNT } from '../types/game';
 import { PowerUpManager, PowerUpPickup } from '../entities/PowerUp';
+import { Level2Architecture } from '../systems/Level2Architecture';
+import { Level3Architecture } from '../systems/Level3Architecture';
+import { RootlineManager } from '../systems/RootlineManager';
+import { LevelState } from '../systems/LevelState';
 
 /**
  * A realm: a traversal approach followed by a boss arena.
@@ -45,6 +49,7 @@ export class ArenaScene extends Phaser.Scene {
   private lockOn?: Phaser.GameObjects.Image;
   private backdrop?: Backdrop;
   private juice?: Juice;
+  private rootlineManager?: RootlineManager;
 
   private isPaused = false;
   private isLevelEnding = false;
@@ -100,8 +105,21 @@ export class ArenaScene extends Phaser.Scene {
     this.finaleEscalated = false;
     this.startedAtCheckpoint = Boolean(data?.fromCheckpoint);
     this.currentStageIndex = 1;
+    this.stageCheckpoints = this.currentLevel === 3
+      ? [180, 1500, 2900, 4300, 5700, 7100]
+      : this.currentLevel === 2
+      ? [190, 1440, 2840, 4240, 5640, 7040]
+      : [180, 1400, 2680, 3960, 5260];
     this.announcedStages.clear();
     this.fragmentAbsorbed = false;
+
+    const config: LevelConfig = LEVELS[this.currentLevel] || LEVELS[1];
+    LevelState.set({
+      level: this.currentLevel,
+      name: config.name,
+      subtitle: config.subtitle,
+      objective: config.objective,
+    });
     SaveManager.saveUnlockedLevel(this.currentLevel);
   }
 
@@ -131,17 +149,52 @@ export class ArenaScene extends Phaser.Scene {
     this.backdrop = new Backdrop(this, this.currentLevel, VIEW_W, VIEW_H);
     this.createAtmosphereGrade(config);
 
-    this.createGround(arena);
-    this.createStaticPlatforms(arena);
-
     this.playerProjectiles = createProjectilePool(this, 48);
     this.bossProjectiles = createProjectilePool(this, 80);
     this.hazards = new HazardManager(this, this.juice, this.groundTop);
 
+    this.dynamicPlatforms = new DynamicPlatformManager(
+      this,
+      this.juice,
+      `platform_l${this.currentLevel}`,
+      arena.platforms.filter((p) => p.behaviour && p.behaviour !== 'static')
+    );
+
+    this.createGround(arena);
+    this.createStaticPlatforms(arena);
+
     // Retrying after a death in the fight resumes at the arena mouth.
-    const spawnX = this.startedAtCheckpoint && this.arenaStartX
+    let spawnX = this.startedAtCheckpoint && this.arenaStartX
       ? this.arenaStartX - 120
       : arena.playerSpawnX;
+
+    if (typeof window !== 'undefined') {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        const urlSpawn = p.get('spawnX');
+        if (urlSpawn) spawnX = parseInt(urlSpawn, 10);
+        const urlStage = p.get('stage');
+        if (urlStage) {
+          const stNum = parseInt(urlStage, 10);
+          if (this.currentLevel === 3) {
+            const stageStarts = [180, 1600, 3000, 4400, 5800, 7200];
+            if (stNum >= 1 && stNum <= 6) {
+              spawnX = stageStarts[stNum - 1];
+            }
+          } else if (this.currentLevel === 2) {
+            const stageStarts = [190, 1600, 3200, 4400, 5800, 7200];
+            if (stNum >= 1 && stNum <= 6) {
+              spawnX = stageStarts[stNum - 1];
+            }
+          } else if (this.currentLevel === 1) {
+            const stageStarts = [180, 1500, 2800, 4100, 5400];
+            if (stNum >= 1 && stNum <= 5) {
+              spawnX = stageStarts[stNum - 1];
+            }
+          }
+        }
+      } catch (_) {}
+    }
 
     this.player = new GOne(
       this,
@@ -154,12 +207,10 @@ export class ArenaScene extends Phaser.Scene {
     this.lastSafeX = spawnX;
     this.lastSafeY = this.groundTop - 120;
 
-    this.dynamicPlatforms = new DynamicPlatformManager(
-      this,
-      this.juice,
-      `platform_l${this.currentLevel}`,
-      arena.platforms.filter((p) => p.behaviour && p.behaviour !== 'static')
-    );
+    if (this.currentLevel === 3) {
+      this.rootlineManager = new RootlineManager(this, this.player, this.juice);
+      Level3Architecture.buildAnchors(this.rootlineManager);
+    }
 
     this.staticHazards = new StaticHazardField(
       this,
@@ -217,12 +268,12 @@ export class ArenaScene extends Phaser.Scene {
     this.pointerWorld = { x: spawnX + 300, y: this.groundTop - 100 };
     this.player.setAimTarget(this.pointerWorld.x, this.pointerWorld.y);
 
-    // Starting at the checkpoint means the fight is already joined.
-    if (this.startedAtCheckpoint || !this.arenaStartX) {
+    // Starting at the checkpoint or inside the arena means the fight is already joined.
+    if (this.startedAtCheckpoint || !this.arenaStartX || spawnX >= this.arenaStartX) {
       this.enterArena(config, true);
     } else {
       this.announceObjective(config.objective);
-      if (this.currentLevel === 1) {
+      if (this.currentLevel === 1 || this.currentLevel === 2) {
         this.time.delayedCall(400, () => {
           this.checkStageProgression(spawnX);
         });
@@ -242,10 +293,19 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private createGround(arena: ArenaGeometry) {
-    const key = `platform_l${this.currentLevel}`;
+    const defaultKey = `platform_l${this.currentLevel}`;
     this.platforms = this.physics.add.staticGroup();
 
-    const tile = this.textures.get(key).getSourceImage();
+    if (this.currentLevel === 2) {
+      Level2Architecture.build(this, this.platforms, this.dynamicPlatforms!, arena);
+      return;
+    }
+    if (this.currentLevel === 3) {
+      Level3Architecture.build(this, this.platforms, this.dynamicPlatforms!, arena);
+      return;
+    }
+
+    const tile = this.textures.get(defaultKey).getSourceImage();
     const tileW = (tile as { width?: number }).width || 256;
     const tileH = (tile as { height?: number }).height || 80;
     const groundThickness = 140;
@@ -257,7 +317,7 @@ export class ArenaScene extends Phaser.Scene {
       // Omit segments that fall inside a pit. Tested at both edges so a tile
       // is only dropped when it is genuinely inside the gap.
       if (this.isGap(cx - tileW / 2) || this.isGap(cx + tileW / 2)) continue;
-      const seg = this.platforms.create(cx, arena.groundTop + groundThickness / 2, key);
+      const seg = this.platforms.create(cx, arena.groundTop + groundThickness / 2, defaultKey);
       seg.setScale(1.02, scaleY).refreshBody();
     }
 
@@ -276,19 +336,26 @@ export class ArenaScene extends Phaser.Scene {
 
   /** Only plain surfaces here; dynamic ones are owned by DynamicPlatformManager. */
   private createStaticPlatforms(arena: ArenaGeometry) {
-    if (!this.platforms) return;
-    const key = `platform_l${this.currentLevel}`;
-    const tile = this.textures.get(key).getSourceImage();
-    const tileW = (tile as { width?: number }).width || 256;
-    const tileH = (tile as { height?: number }).height || 80;
+    if (!this.platforms || this.currentLevel === 2 || this.currentLevel === 3) return;
+    const defaultKey = `platform_l${this.currentLevel}`;
+    const tile = this.textures.get(defaultKey).getSourceImage();
+    const defaultTileW = (tile as { width?: number }).width || 256;
+    const defaultTileH = (tile as { height?: number }).height || 80;
 
     arena.platforms
       .filter((p) => !p.behaviour || p.behaviour === 'static')
       .forEach((p) => {
-        const scaleX = p.width / tileW;
-        const plat = this.platforms!.create(p.x, p.y + tileH * 0.3, key);
+        const key = p.textureKey && this.textures.exists(p.textureKey)
+          ? p.textureKey
+          : defaultKey;
+        const curTile = this.textures.get(key).getSourceImage();
+        const curTileW = (curTile as { width?: number }).width || defaultTileW;
+        const curTileH = (curTile as { height?: number }).height || defaultTileH;
+
+        const scaleX = p.width / curTileW;
+        const plat = this.platforms!.create(p.x, p.y + curTileH * 0.3, key);
         plat.setScale(scaleX, 0.65).refreshBody();
-        this.addContactShadow(p.x, p.y + tileH * 0.65, p.width);
+        this.addContactShadow(p.x, p.y + curTileH * 0.65, p.width);
       });
   }
 
@@ -363,6 +430,7 @@ export class ArenaScene extends Phaser.Scene {
     if (!this.player) return;
     const cam = this.cameras.main;
     cam.startFollow(this.player, true, 0.08, 0.08, 0, 40);
+    cam.centerOn(this.player.x, this.player.y);
     cam.setDeadzone(220, 140);
     cam.fadeIn(260, 0, 0, 0);
   }
@@ -401,13 +469,25 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.time.delayedCall(immediate ? 700 : 500, () => {
-      if (this.boss?.active) this.juice?.taunt(config.openingTaunt, VILLAIN.energy);
+      if (this.boss?.active) {
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: config.openingTaunt,
+          speaker: this.currentLevel === 3 ? 'THE WORLDSEED GUARDIAN' : this.currentLevel === 2 ? 'THE LAST WARDEN' : 'RA-ONE',
+          priority: 2,
+        });
+      }
     });
   }
 
   private announceObjective(objective: string) {
     this.time.delayedCall(500, () => {
-      if (this.scene.isActive()) this.juice?.taunt(objective, HERO.energy);
+      if (this.scene.isActive()) {
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: objective,
+          speaker: 'SYSTEM',
+          priority: 2,
+        });
+      }
     });
   }
 
@@ -615,12 +695,20 @@ export class ArenaScene extends Phaser.Scene {
       if (dist <= data.radius) this.boss.takeDamage(data.damage);
     };
 
-    // Realm 6 only: the arena itself reacts once Ra-One enters his final
-    // phase — the campaign's one explicit "the battlefield escalates for
-    // the finale" beat. Cosmetic only (camera punch, flash, a deeper
-    // atmosphere wash) — no new hazard geometry, so there is nothing here
-    // that needs jump-safety or softlock verification.
+    // Boss Phase Escalation: Reacts dynamically during boss encounters
     const onBossPhaseChanged = (data: { phase: number }) => {
+      if (this.currentLevel === 2) {
+        EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+          label: 'GUARDIAN PHASE',
+          value: `PHASE ${data.phase} (${data.phase >= 3 ? 'OVERLOAD' : 'ENRAGED'})`,
+          alert: true,
+        });
+        this.juice?.zoomPunch(0.04, 240);
+        this.juice?.flash(VILLAIN.energy, 0.35, 300);
+        this.juice?.shake(0.014, 300);
+        AudioManager.getInstance().playOverdrive();
+        return;
+      }
       if (this.currentLevel !== 6 || this.finaleEscalated || data.phase < 3) return;
       this.finaleEscalated = true;
       this.juice?.zoomPunch(0.05, 260);
@@ -630,6 +718,93 @@ export class ArenaScene extends Phaser.Scene {
         this.tweens.add({ targets: this.atmosphereGrade, alpha: 0.16, duration: 500 });
       }
       AudioManager.getInstance().playOverdrive();
+    };
+
+    // Level 2 Interactive Terminal Handlers
+    const onCitadelUnlocked = () => {
+      EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+        label: 'SECURITY STATUS',
+        value: 'OVERRIDE ACCEPTED - UNLOCKED',
+        alert: false,
+      });
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: 'Citadel security lockdown overridden. Inner blast doors open.',
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+    };
+
+    const onReactorStabilized = () => {
+      EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+        label: 'REACTOR STABILITY',
+        value: 'CORE STABILIZED',
+        alert: false,
+      });
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: 'Reactor core stabilized. Dimensional flux normalized.',
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+    };
+
+    const onVaultPurged = () => {
+      EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+        label: 'CONTAINMENT STATUS',
+        value: 'SYSTEM PURGED',
+        alert: false,
+      });
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: 'Vault purge sequence complete. Containment cycle dampened.',
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+    };
+
+    const onNexusRerouted = () => {
+      EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+        label: 'CORRUPTION SURGE',
+        value: 'SURGE REROUTED',
+        alert: false,
+      });
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: 'Nexus power rerouted to primary conduit. Guardian chamber unsealed.',
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+    };
+
+    const onHeartrootHarmonized = () => {
+      this.juice?.shake(0.016, 400);
+      AudioManager.getInstance().playRelicCollect();
+      EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+        label: 'HEARTROOT CONDUIT',
+        value: 'HARMONIZED // BRIDGE ACTIVE',
+      });
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: 'HEARTROOT CONDUIT HARMONIZED. Living bio-light bridge restored across the sanctuary chasm!',
+        speaker: 'SYSTEM',
+        duration: 4500,
+        priority: 2,
+      });
+    };
+
+    const onSeedContainmentOvercharged = () => {
+      this.juice?.shake(0.018, 450);
+      AudioManager.getInstance().playOverdrive();
+      EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+        label: 'SEED CONTAINMENT',
+        value: 'DISENGAGED // ARBITER AWAITS',
+      });
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: 'WORLDS EED CONTAINMENT MATRIX OVERCHARGED. Sanctuary Portal unsealed! Proceed to the Arbiter.',
+        speaker: 'SYSTEM',
+        duration: 4500,
+        priority: 2,
+      });
     };
 
     const onBossDied = () => {
@@ -665,6 +840,16 @@ export class ArenaScene extends Phaser.Scene {
     EventBus.on(GAME_EVENTS.RESTART_STORY, onRestartStory);
     EventBus.on(GAME_EVENTS.QUIT_TO_MENU, onQuitToMenu);
 
+    const onLevelSync = () => this.syncHud();
+    EventBus.on('request-level-sync', onLevelSync);
+
+    EventBus.on('citadel-security-unlocked', onCitadelUnlocked);
+    EventBus.on('reactor-core-stabilized', onReactorStabilized);
+    EventBus.on('vault-purged', onVaultPurged);
+    EventBus.on('nexus-rerouted', onNexusRerouted);
+    EventBus.on('heartroot-harmonized', onHeartrootHarmonized);
+    EventBus.on('seed-containment-overcharged', onSeedContainmentOvercharged);
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off(GAME_EVENTS.SCREEN_SHAKE, onShake);
       EventBus.off(GAME_EVENTS.OVERDRIVE_BURST, onOverdriveBurst);
@@ -676,9 +861,19 @@ export class ArenaScene extends Phaser.Scene {
       EventBus.off(GAME_EVENTS.RESTART_LEVEL, onRestartLevel);
       EventBus.off(GAME_EVENTS.RESTART_STORY, onRestartStory);
       EventBus.off(GAME_EVENTS.QUIT_TO_MENU, onQuitToMenu);
+      EventBus.off('request-level-sync', onLevelSync);
+
+      EventBus.off('citadel-security-unlocked', onCitadelUnlocked);
+      EventBus.off('reactor-core-stabilized', onReactorStabilized);
+      EventBus.off('vault-purged', onVaultPurged);
+      EventBus.off('nexus-rerouted', onNexusRerouted);
+      EventBus.off('heartroot-harmonized', onHeartrootHarmonized);
+      EventBus.off('seed-containment-overcharged', onSeedContainmentOvercharged);
+
       if (this.contextMenuHandler) this.game.canvas?.removeEventListener('contextmenu', this.contextMenuHandler);
       // Teardown order matters: managers own timers and tweens that would
       // otherwise fire against destroyed sprites on the next scene.
+      try { this.rootlineManager?.destroy(); } catch (_) {}
       try { this.staticHazards?.destroy(); } catch (_) {}
       try { this.dynamicPlatforms?.destroy(); } catch (_) {}
       try { this.enemies?.destroy(); } catch (_) {}
@@ -692,6 +887,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private syncHud() {
+    const config = LEVELS[this.currentLevel] || LEVELS[1];
+    EventBus.emit(GAME_EVENTS.LEVEL_LOADED, {
+      level: this.currentLevel,
+      name: config.name,
+      subtitle: config.subtitle,
+    });
     if (!this.player || !this.boss) return;
     EventBus.emit(GAME_EVENTS.PLAYER_HEALTH_CHANGED, {
       current: this.player.currentHealth,
@@ -722,41 +923,51 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleBossDefeated() {
-    try {
-      const kids = (this.bossProjectiles as unknown as { children?: unknown })?.children;
-      if (this.bossProjectiles && kids && typeof (kids as { forEach?: unknown }).forEach === 'function') {
-        this.bossProjectiles.clear(true, true);
-      }
-    } catch (_) {}
-    try { this.hazards?.clearAll(); } catch (_) {}
-    try { this.enemies?.destroy(); } catch (_) {}
-    try { this.juice?.clearFreeze(); } catch (_) {}
-
-    if (this.currentLevel === 1) {
-      // Re-enable progression: Level 1 has a playable physical Stage 5 sanctuary!
-      this.isLevelEnding = false;
-
-      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-        text: "The Corrupted Guardian falls! The sanctuary seal to the east has deactivated. Proceed forward to claim the Protocol Fragment.",
-        speaker: 'SYSTEM',
-        duration: 5500,
-        priority: 2,
-      });
-      EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
-        title: 'SANCTUARY UNLOCKED',
-        instruction: 'Ra-One neutralized. Head East past x:5120 into Stage 5 to claim the Protocol Fragment.',
-        timeout: 7000,
-      });
-
-      EventBus.emit('open_stage5_gate');
-      return;
-    }
-
     this.clearCombatObjects();
 
     const next = this.currentLevel + 1;
+    SaveManager.saveUnlockedLevel(next);
+
+    if (this.currentLevel === 1) {
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: "The Corrupted Guardian falls! Claim the Protocol Fragment to enter Realm II — INFERNAL FORTRESS.",
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+      this.time.delayedCall(1200, () => {
+        this.showLevelTransition(2, REALM_TRANSITIONS[2] ?? []);
+      });
+      return;
+    }
+
+    if (this.currentLevel === 2) {
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: "The Last Warden is extinguished. Infernal Fortress has fallen! Transitioning to Realm III — THE VERDANT ABYSS.",
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+      this.time.delayedCall(1200, () => {
+        this.showLevelTransition(3, REALM_TRANSITIONS[3] ?? []);
+      });
+      return;
+    }
+
+    if (this.currentLevel === 3) {
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: "The Worldseed Guardian yields. The living biosphere stabilizes! Transitioning to Realm IV — FROZEN OBSERVATORY.",
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+      this.time.delayedCall(1200, () => {
+        this.showLevelTransition(4, REALM_TRANSITIONS[4] ?? []);
+      });
+      return;
+    }
+
     if (next <= REALM_COUNT) {
-      SaveManager.saveUnlockedLevel(next);
       this.showLevelTransition(next, REALM_TRANSITIONS[next] ?? []);
     } else {
       EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'VICTORY');
@@ -770,10 +981,9 @@ export class ArenaScene extends Phaser.Scene {
   private showLevelTransition(nextLevel: number, storyLines: string[]) {
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'LEVEL_TRANSITION');
 
-    // Realm 1's fifth internal stage ("Protocol Fragment") has no traversal
-    // geometry of its own yet, so its painted art becomes this reward beat
-    // between realms instead of sitting unused.
-    const stageArtKey = `bg_realm${this.currentLevel}_stage5`;
+    const stageArtKey = this.currentLevel === 1
+      ? 'bg_realm1_stage5'
+      : (this.textures.exists(`bg_realm${nextLevel}`) ? `bg_realm${nextLevel}` : `bg_realm${this.currentLevel}`);
     const hasStageArt = this.textures.exists(stageArtKey);
     const fadeTargets: Phaser.GameObjects.GameObject[] = [];
 
@@ -829,16 +1039,16 @@ export class ArenaScene extends Phaser.Scene {
       .setAlpha(0);
 
     // Realm 1's exit is the Protocol Fragment beat: a real interactive pickup
-    // rather than a click-anywhere dismissal, matching the "contextual
-    // interaction, absorption, reward" sequence other realms don't have art
-    // for yet.
+    // rather than a click-anywhere dismissal.
     const isFragmentBeat = hasStageArt && this.currentLevel === 1 && !this.fragmentAbsorbed;
 
     const prompt = this.add
       .text(
         VIEW_W / 2,
         VIEW_H / 2 + 150,
-        isFragmentBeat ? '[ CLICK THE FRAGMENT OR PRESS E TO ABSORB ]' : '[ CLICK OR PRESS SPACE TO CONTINUE ]',
+        isFragmentBeat
+          ? '[ CLICK FRAGMENT, PRESS E, OR PRESS SPACE / ENTER TO ENTER REALM II ]'
+          : `[ PRESS SPACE / ENTER OR CLICK TO ENTER ${nextName || 'NEXT REALM'} ]`,
         {
           fontFamily: 'Rajdhani, sans-serif',
           fontSize: '18px',
@@ -914,7 +1124,19 @@ export class ArenaScene extends Phaser.Scene {
         duration: 420,
         ease: 'Quad.easeIn',
         delay: isFragmentBeat ? 260 : 0,
-        onComplete: () => this.scene.restart({ level: nextLevel, fromCheckpoint: false }),
+        onComplete: () => {
+          if (getRealmReveal(nextLevel)) {
+            AudioManager.getInstance().stopMusic();
+            const onFinished = () => {
+              EventBus.off('realm-reveal-finished', onFinished);
+              this.scene.restart({ level: nextLevel, fromCheckpoint: false });
+            };
+            EventBus.on('realm-reveal-finished', onFinished);
+            EventBus.emit('play-realm-reveal', { level: nextLevel });
+          } else {
+            this.scene.restart({ level: nextLevel, fromCheckpoint: false });
+          }
+        },
       });
     };
 
@@ -1154,16 +1376,26 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private getCurrentStageIndex(x: number): number {
-    if (this.currentLevel !== 1) return 1;
-    if (x < 1300) return 1;
-    if (x < 2600) return 2;
-    if (x < 3900) return 3;
-    if (x < 5200) return 4;
-    return 5;
+    if (this.currentLevel === 1) {
+      if (x < 1300) return 1;
+      if (x < 2600) return 2;
+      if (x < 3900) return 3;
+      if (x < 5200) return 4;
+      return 5;
+    }
+    if (this.currentLevel === 2 || this.currentLevel === 3) {
+      if (x < 1400) return 1;
+      if (x < 2800) return 2;
+      if (x < 4200) return 3;
+      if (x < 5600) return 4;
+      if (x < 7000) return 5;
+      return 6;
+    }
+    return 1;
   }
 
   private checkStageProgression(playerX: number) {
-    if (this.currentLevel !== 1) return;
+    if (this.currentLevel !== 1 && this.currentLevel !== 2 && this.currentLevel !== 3) return;
     const stage = this.getCurrentStageIndex(playerX);
     if (stage !== this.currentStageIndex) {
       this.currentStageIndex = stage;
@@ -1176,72 +1408,312 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private triggerStageNarrative(stage: number) {
-    switch (stage) {
-      case 1:
-        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-          text: 'Stage 1: Awakening — Auxiliary power offline. Access the Power Relay console to override the security blast door.',
-          speaker: 'SYSTEM',
-          duration: 5200,
-          priority: 2,
-        });
-        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
-          title: 'STAGE 1: AWAKENING',
-          instruction: 'Move with [A]/[D], Jump with [W]/[Space]. Approach the Power Relay console at x:720 and press [E] to restore power.',
-          timeout: 6500,
-        });
-        break;
-      case 2:
-        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-          text: 'Stage 2: Sky Sentinels — Aerial patrol detected. Deploy Aegis Shield to deflect incoming plasma barrages.',
-          speaker: 'G-ONE',
-          duration: 5200,
-          priority: 2,
-        });
-        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
-          title: 'STAGE 2: SKY SENTINELS',
-          instruction: 'Step on Launch Pads to scale vertical catwalks. Press [K] or Right-Click to raise Aegis Shield and reflect laser volleys.',
-          timeout: 6500,
-        });
-        break;
-      case 3:
-        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-          text: 'Stage 3: The Shattered Bridge — The structure is crumbling over the abyss. Traverse quickly before platforms collapse.',
-          speaker: 'SYSTEM',
-          duration: 5200,
-          priority: 2,
-        });
-        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
-          title: 'STAGE 3: THE SHATTERED BRIDGE',
-          instruction: 'Stepping on fractured bridge fragments triggers collapse in 0.7s. Jump decisively across 160-240px gaps.',
-          timeout: 6500,
-        });
-        break;
-      case 4:
-        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-          text: 'Stage 4: The Corrupted Guardian — Ra-One has compromised the primary defense core. Beware his kinetic plating!',
-          speaker: 'G-ONE',
-          duration: 5200,
-          priority: 2,
-        });
-        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
-          title: 'STAGE 4: THE CORRUPTED GUARDIAN',
-          instruction: 'Ra-One deflects basic Pulse fire during windup. Evade his telegraphed strikes, then counter-attack during his 1.4s exposed cooling phase.',
-          timeout: 7000,
-        });
-        break;
-      case 5:
-        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-          text: 'Stage 5: Protocol Fragment — The sanctuary core resonates. Approach the altar to claim the fragment.',
-          speaker: 'SYSTEM',
-          duration: 5200,
-          priority: 2,
-        });
-        EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
-          title: 'STAGE 5: PROTOCOL FRAGMENT',
-          instruction: 'Approach the altar at x:5800. Press [E] or Click the Fragment to absorb Protocol Fragment 01.',
-          timeout: 7000,
-        });
-        break;
+    if (this.currentLevel === 1) {
+      switch (stage) {
+        case 1:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE I OBJECTIVE',
+            value: 'RESTORE POWER RELAY [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 1: Awakening — Auxiliary power offline. Access the Power Relay console to override the security blast door.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 1: AWAKENING',
+            instruction: 'Move with [A]/[D], Jump with [W]/[Space]. Approach the Power Relay console at x:720 and press [E] to restore power.',
+            timeout: 6500,
+          });
+          break;
+        case 2:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE II OBJECTIVE',
+            value: 'DEFLECT SENTINEL VOLLEYS',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 2: Sky Sentinels — Aerial patrol detected. Deploy Aegis Shield to deflect incoming plasma barrages.',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 2: SKY SENTINELS',
+            instruction: 'Step on Launch Pads to scale vertical catwalks. Press [K] or Right-Click to raise Aegis Shield and reflect laser volleys.',
+            timeout: 6500,
+          });
+          break;
+        case 3:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE III OBJECTIVE',
+            value: 'CROSS COLLAPSING BRIDGE',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 3: The Shattered Bridge — The structure is crumbling over the abyss. Traverse quickly before platforms collapse.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 3: THE SHATTERED BRIDGE',
+            instruction: 'Stepping on fractured bridge fragments triggers collapse in 0.7s. Jump decisively across 160-240px gaps.',
+            timeout: 6500,
+          });
+          break;
+        case 4:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE IV OBJECTIVE',
+            value: 'DEFEAT RA-ONE',
+            alert: true,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 4: The Corrupted Guardian — Ra-One has compromised the primary defense core. Beware his kinetic plating!',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 4: THE CORRUPTED GUARDIAN',
+            instruction: 'Ra-One deflects basic Pulse fire during windup. Evade his telegraphed strikes, then counter-attack during his 1.4s exposed cooling phase.',
+            timeout: 7000,
+          });
+          break;
+        case 5:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE V OBJECTIVE',
+            value: 'ABSORB PROTOCOL FRAGMENT',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 5: Protocol Fragment — The sanctuary core resonates. Approach the altar to claim the fragment.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 5: PROTOCOL FRAGMENT',
+            instruction: 'Approach the altar at x:5800. Press [E] or Click the Fragment to absorb Protocol Fragment 01.',
+            timeout: 7000,
+          });
+          break;
+      }
+      return;
+    }
+
+    if (this.currentLevel === 2) {
+      switch (stage) {
+        case 1:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE I OBJECTIVE',
+            value: 'CROSS THE RUINED BRIDGE',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 1: The Divide Approach — The fortress approach is shattered. Cross collapsing spans and breach the perimeter.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 1: THE DIVIDE APPROACH',
+            instruction: 'Crumbling volcanic spans shake and fall 0.75s after contact. Time your leaps and use Phase Dash [Shift] to cross wide chasms.',
+            timeout: 6500,
+          });
+          break;
+        case 2:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE II OBJECTIVE',
+            value: 'OVERRIDE SECURITY GATE [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 2: The Crimson Citadel — Heavy security perimeter active. Hack the Citadel Security Console at x:2050 to lower blast barriers.',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 2: THE CRIMSON CITADEL',
+            instruction: 'Step on Launch Pads to scale sniper balconies and claim relics. Press [E] at the Security Console to bypass blast doors.',
+            timeout: 6500,
+          });
+          break;
+        case 3:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE III OBJECTIVE',
+            value: 'STABILIZE REACTOR CORE [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 3: The Fracture Core — Violent dimensional rifts detected. Ride the magnetic ferry and stabilize the cooling console at x:3660.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 3: THE FRACTURE CORE',
+            instruction: 'Phased crimson energy bridges cycle in and out on a timed rhythm. Cross with precise momentum or ride the core shuttle.',
+            timeout: 6500,
+          });
+          break;
+        case 4:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE IV OBJECTIVE',
+            value: 'PURGE VAULT HAZARDS [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 4: The Entropy Vault — High-voltage laser containment online. Access the Vault Purge terminal at x:5000 to neutralize emitters.',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 4: THE ENTROPY VAULT',
+            instruction: 'Synchronized laser barriers cycle out of phase. Time your dash past active beams or override them at the terminal.',
+            timeout: 6500,
+          });
+          break;
+        case 5:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE V OBJECTIVE',
+            value: 'REROUTE CORE CONDUIT [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 5: The Entropy Nexus — Core energy destabilizing. Scale the ascending lifts and reroute conduit power at x:6420.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 5: THE ENTROPY NEXUS',
+            instruction: 'Ascend moving core elevators and collapsing spans. Rerouting the terminal opens the sanctum gates to the Last Warden.',
+            timeout: 6500,
+          });
+          break;
+        case 6:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE VI OBJECTIVE',
+            value: 'NEUTRALIZE THE LAST WARDEN',
+            alert: true,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 6: The Last Warden — The ultimate fortress guardian awakens. Beware kinetic shields and arena-wide energy surges!',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 6: THE LAST WARDEN',
+            instruction: 'Use elevated tactical masonry platforms to avoid molten ground strikes. Exploit cooling recovery windows after heavy slams.',
+            timeout: 7000,
+          });
+          break;
+      }
+    }
+
+    if (this.currentLevel === 3) {
+      switch (stage) {
+        case 1:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE I OBJECTIVE',
+            value: 'DISCOVER ROOTLINE ANCHORS [F]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: "Stage 1: The Living Threshold — Biomechanical root structures react to G-ONE's presence. Use Rootline [F] to tether and vault to higher branches.",
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 1: THE LIVING THRESHOLD',
+            instruction: 'Approach glowing bio-anchors and press [F] or Click to engage Rootline tether and vault across chasms.',
+            timeout: 6500,
+          });
+          break;
+        case 2:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE II OBJECTIVE',
+            value: 'NAVIGATE CANOPY CHASM',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 2: The Verdant Wilds — Acidic spore marshes cover the forest floor. Utilize Canopy Swing Tendrils and Spore Launch Bulbs to maintain high ground.',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 2: THE VERDANT WILDS',
+            instruction: 'Transfer anchors enable parabolic swings across chasms. Spore bulbs propel you to high observation decks with rare relics.',
+            timeout: 6500,
+          });
+          break;
+        case 3:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE III OBJECTIVE',
+            value: 'ASCEND THE COLOSSUS INTERIOR',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 3: The Hollow Colossus — An immense hollow tree serving as an organic transmission tower. Ride the vertical bio-elevator and traverse core interior gantries.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 3: THE HOLLOW COLOSSUS',
+            instruction: 'Board the moving bio-elevator to ascend vertical trunk sections. Beware Canopy Hunters diving from overhead perches.',
+            timeout: 6500,
+          });
+          break;
+        case 4:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE IV OBJECTIVE',
+            value: 'HARMONIZE HEARTROOT CONDUIT [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 4: The Heartroot Sanctuary — Sacred cathedral of living technology. Access the Heartroot Blossom at x:4850 to restore the retracted light-bridge.',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 4: THE HEARTROOT SANCTUARY',
+            instruction: 'Harmonize the environmental blossom node [E / F] to channel bio-luminescence and solidify the light-bridge span.',
+            timeout: 6500,
+          });
+          break;
+        case 5:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE V OBJECTIVE',
+            value: 'OVERCHARGE SEED CONTAINMENT [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 5: The Biosphere Crucible — The core containment chamber. Cross phasing bio-bridges, defeat the Crucible Vanguard, and override containment at x:6720.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 5: THE BIOSPHERE CRUCIBLE',
+            instruction: 'Bio-light bridges cycle on timed frequencies. Override containment to unseal the Sanctuary Portal leading to the Arbiter.',
+            timeout: 6500,
+          });
+          break;
+        case 6:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE VI OBJECTIVE',
+            value: 'DEFEAT THE WORLDS EED GUARDIAN',
+            alert: true,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 6: The Worldseed Guardian — The ancient arbiter of the Verdant Abyss awakens. Grapple with Rootline to evade ground root sweeps!',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 6: THE WORLDSEED GUARDIAN',
+            instruction: 'Evade ground root surges using the high central grapple anchor. Time your strikes during the recovery window after energy beams.',
+            timeout: 7000,
+          });
+          break;
+      }
     }
   }
 
@@ -1249,6 +1721,7 @@ export class ArenaScene extends Phaser.Scene {
     this.juice?.update(time);
     this.powerUps?.update(time, delta);
     this.staticHazards?.update(time, delta);
+    this.rootlineManager?.update(time, delta);
     if (this.player) {
       this.staticHazards?.checkTrigger(this.player.x);
       if (!this.player.isDead) {

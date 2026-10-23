@@ -57,7 +57,11 @@ export class DynamicPlatformManager {
 
     specs.forEach((spec) => {
       const isLaunch = spec.behaviour === 'launch';
-      const actualKey = isLaunch && scene.textures.exists('launch_pad') ? 'launch_pad' : textureKey;
+      const actualKey = isLaunch && scene.textures.exists('launch_pad')
+        ? 'launch_pad'
+        : spec.textureKey && scene.textures.exists(spec.textureKey)
+        ? spec.textureKey
+        : textureKey;
       const isCustomKey = actualKey !== textureKey;
       const curTex = isCustomKey ? scene.textures.get(actualKey).getSourceImage() : tex;
       const curW = (curTex as { width?: number }).width || 256;
@@ -111,15 +115,20 @@ export class DynamicPlatformManager {
 
   /** Behaviour-specific tinting so a platform's nature is readable at a glance. */
   private tint(m: Managed) {
+    const isLevel2 = Boolean(m.spec.textureKey?.startsWith('platform_l2'));
     switch (m.spec.behaviour) {
       case 'moving':
-        m.sprite.setTint(0xcfe8ff);
+        if (isLevel2) {
+          m.sprite.clearTint();
+        } else {
+          m.sprite.setTint(0xcfe8ff);
+        }
         break;
       case 'collapsing':
-        m.sprite.setTint(0xffd0a0);
+        m.sprite.setTint(isLevel2 ? 0xff5a1f : 0xffd0a0);
         break;
       case 'phasing':
-        m.sprite.setTint(0x9fe8ff);
+        m.sprite.setTint(isLevel2 ? 0xff243d : 0x9fe8ff);
         break;
       case 'launch':
         m.sprite.clearTint();
@@ -179,15 +188,17 @@ export class DynamicPlatformManager {
     if (m.spec.behaviour !== 'collapsing' || m.triggered) return;
     m.triggered = true;
 
-    // State 2: WARNING (Cracks glow amber, warning sound)
-    m.sprite.setTint(0xffaa44);
+    const isLevel2 = Boolean(m.spec.textureKey?.startsWith('platform_l2'));
+
+    // State 2: WARNING (Ember cracks glow, warning sound)
+    m.sprite.setTint(isLevel2 ? 0xff5a1f : 0xffaa44);
     this.juice.impact(m.sprite.x, m.sprite.y, 'neutral', { scale: 0.4, sparks: 4 });
 
     // Transition to State 3: SHAKING after 200ms
     this.track(
       this.scene.time.delayedCall(200, () => {
         if (!this.alive || !m.sprite.active) return;
-        m.sprite.setTint(0xff3344);
+        m.sprite.setTint(isLevel2 ? 0xff243d : 0xff3344);
 
         // State 3: Violent Shudder / Shake for 450ms
         this.scene.tweens.add({

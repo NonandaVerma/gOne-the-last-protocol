@@ -221,7 +221,11 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
       });
     }
 
-    this.juice.taunt(this.phase === 2 ? CFG.dialogues.phase2 : CFG.dialogues.phase3);
+    EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+      text: this.phase === 2 ? CFG.dialogues.phase2 : CFG.dialogues.phase3,
+      speaker: 'RA-ONE',
+      priority: 2,
+    });
   }
 
   // =========================================================================
@@ -767,7 +771,11 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.juice.hitStop(180);
     this.juice.shake(0.035, 900);
     this.juice.flash(VILLAIN.energy, 0.45, 420);
-    this.juice.taunt(CFG.dialogues.onDefeat);
+    EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+      text: CFG.dialogues.onDefeat,
+      speaker: 'RA-ONE',
+      priority: 2,
+    });
     this.play('raone-defeat', true);
 
     if (this.aura) {

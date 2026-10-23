@@ -279,36 +279,13 @@ export class Juice {
     });
   }
 
-  /** Cinematic subtitle band used for boss taunts. */
-  public taunt(message: string, color: number = VILLAIN.energy) {
-    const cam = this.scene.cameras.main;
-    const hex = `#${color.toString(16).padStart(6, '0')}`;
-    const y = cam.height - 118;
-
-    const text = this.scene.add
-      .text(cam.width / 2, y, message, {
-        fontFamily: 'Rajdhani, sans-serif',
-        fontSize: '26px',
-        color: hex,
-        align: 'center',
-        stroke: '#000000',
-        strokeThickness: 5,
-        wordWrap: { width: cam.width * 0.7 },
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(this.depth + 10)
-      .setAlpha(0);
-
-    this.scene.tweens.add({
-      targets: text,
-      alpha: 1,
-      y: y - 12,
-      duration: 260,
-      ease: 'Quad.easeOut',
-      hold: 1900,
-      yoyo: true,
-      onComplete: () => text.destroy(),
-    });
-  }
+  /*
+   * `taunt()` was removed: it drew boss/objective dialogue directly on the
+   * Phaser canvas with a hardcoded 'Rajdhani, sans-serif' font string, which
+   * does not reliably resolve to the same next/font-loaded Rajdhani the React
+   * UI uses — a second, visually inconsistent text pipeline sitting in the
+   * same bottom band as `NarrationOverlay`. All former call sites now emit
+   * `GAME_EVENTS.SHOW_SUBTITLE` instead, so there's one subtitle system,
+   * one font, one position.
+   */
 }

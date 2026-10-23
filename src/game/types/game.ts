@@ -96,6 +96,8 @@ export interface PlatformSpec {
   phaseOffsetMs?: number;
   /** `launch`: upward impulse velocity (defaults to -1150). */
   launchVelocityY?: number;
+  /** Optional custom texture key for stage-specific materials. */
+  textureKey?: string;
 }
 
 /** Stationary or cyclic dangers placed along the traversal route. */
@@ -165,7 +167,15 @@ export type EnemyKind =
   /** Ground-bound melee lunger. */
   | 'drone'
   /** Hovering ranged attacker that keeps its distance. */
-  | 'seeker';
+  | 'seeker'
+  /** Fast quad-pedal root predator that lunges along terrain. */
+  | 'rootstalker'
+  /** Stationed bio-artillery launching bursting spore mortar projectiles. */
+  | 'sporecaster'
+  /** Arboreal predator that climbs on elevated canopies and dives down. */
+  | 'canopy_hunter'
+  /** Elite bio-armored guardian protecting sacred passages. */
+  | 'guardian_organism';
 
 export interface EnemySpec {
   kind: EnemyKind;

@@ -108,6 +108,19 @@ export class MainMenuScene extends Phaser.Scene {
     };
     EventBus.once(GAME_EVENTS.START_GAME, onStart);
 
+    // If autoplay was requested via URL, trigger once Preload & MainMenu are ready
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('autoplay') === 'true') {
+          const lvl = parseInt(params.get('level') ?? '1', 10);
+          this.time.delayedCall(200, () => {
+            onStart({ level: lvl });
+          });
+        }
+      } catch (_) {}
+    }
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       EventBus.off(GAME_EVENTS.START_GAME, onStart);
       this.owned.forEach((o) => o.destroy());
