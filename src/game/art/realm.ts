@@ -9,6 +9,7 @@ import {
   bloom,
   forge,
   mix,
+  outline,
   path,
   poly,
   rand,
@@ -1062,6 +1063,138 @@ function buildLevel3Materials(scene: Phaser.Scene) {
   });
 }
 
+/**
+ * Level 4: The Voidborn Abyss Dedicated Architectural Material Suite.
+ * Replaces generic slabs with:
+ * - platform_l4_void: Obsidian-violet alien bedrock with pulsing neon amethyst veins.
+ * - platform_l4_megacity: Inverted alien megacity steel walkways with glowing conduit channels.
+ * - platform_l4_crystal: Prismatic amethyst crystalline shelves with internal facets.
+ * - platform_l4_cataclysm: Unstable tectonic crystal formations with glowing fracture lines.
+ * - platform_l4_singularity: Heavy dark void alloy with event horizon dampening rings.
+ * - platform_l4_arena: Colossal Void Sovereign combat arena with radial gravity glyphs.
+ * - platform_l4_arena_wall: Monolithic void boundary gate with vertical gravity chevrons.
+ * - platform_l4_pylon: Heavy vertical anti-gravity column and pylon.
+ * - gravitas_anchor_idle: Dimensional gyro-core anchor.
+ */
+function buildLevel4Materials(scene: Phaser.Scene) {
+  const W = 256;
+  const H = 80;
+  const solidBottom = 54;
+
+  // 1. Stage 1: platform_l4_void (Obsidian violet bedrock)
+  forge(scene, 'platform_l4_void', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x160824, 0x0a0312, 20);
+    // Neon purple gravitational veins
+    for (let px = 18; px < W; px += 36) {
+      path(g, [{ x: px, y: 16 }, { x: px + 12, y: 32 }, { x: px + 4, y: 48 }], 0xa855f7, 0.75, 2);
+    }
+    bandRect(g, 0, 0, W, 13, 0x2e104d, 0x160824, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xc084fc, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0x7e22ce, 0.85, 2);
+  });
+
+  // 2. Stage 2: platform_l4_megacity (Inverted alien megacity metal catwalk)
+  forge(scene, 'platform_l4_megacity', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x1a1228, 0x0d0816, 20);
+    // Industrial girder panels
+    for (let px = 24; px < W; px += 48) {
+      g.lineStyle(2, 0x3b245c, 0.9);
+      g.strokeRect(px - 18, 14, 36, 34);
+      g.fillStyle(0xa855f7, 0.85);
+      g.fillCircle(px, 31, 2.5);
+    }
+    bandRect(g, 0, 0, W, 13, 0x3b245c, 0x1a1228, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xd8b4fe, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0x9333ea, 0.85, 2);
+  });
+
+  // 3. Stage 3: platform_l4_crystal (Prismatic amethyst crystal ridge)
+  forge(scene, 'platform_l4_crystal', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x220c38, 0x0f031b, 20);
+    // Crystal facets
+    for (let px = 16; px < W; px += 32) {
+      poly(g, [{ x: px - 12, y: 14 }, { x: px, y: 38 }, { x: px + 12, y: 14 }], 0x581c87, 0.65);
+      outline(g, [{ x: px - 12, y: 14 }, { x: px, y: 38 }, { x: px + 12, y: 14 }], 0xc084fc, 0.8, 1.5);
+    }
+    bandRect(g, 0, 0, W, 13, 0x581c87, 0x220c38, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xf3e8ff, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0xc084fc, 0.85, 2);
+  });
+
+  // 4. Stage 4: platform_l4_cataclysm (Fractured crystal tectonic platform)
+  forge(scene, 'platform_l4_cataclysm', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x260d3d, 0x10041d, 20);
+    // Jagged fracture cracks
+    for (let px = 20; px < W; px += 40) {
+      path(g, [{ x: px, y: 14 }, { x: px - 8, y: 28 }, { x: px + 6, y: 44 }], 0xd946ef, 0.85, 2);
+    }
+    bandRect(g, 0, 0, W, 13, 0x701a75, 0x260d3d, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xfdf4ff, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0xe879f9, 0.85, 2);
+  });
+
+  // 5. Stage 5: platform_l4_singularity (Deep void alloy with event horizon rings)
+  forge(scene, 'platform_l4_singularity', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x130722, 0x08020f, 20);
+    // Concentric gravitational dampener rings
+    for (let px = 32; px < W; px += 64) {
+      g.lineStyle(2, 0x7e22ce, 0.7);
+      g.strokeCircle(px, 32, 14);
+      g.fillStyle(0xa855f7, 0.9);
+      g.fillCircle(px, 32, 3);
+    }
+    bandRect(g, 0, 0, W, 13, 0x3b0764, 0x130722, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xe9d5ff, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0xa855f7, 0.85, 2);
+  });
+
+  // 6. Stage 6: platform_l4_arena (Void Sovereign colossal arena floor)
+  forge(scene, 'platform_l4_arena', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x150726, 0x090212, 20);
+    // Radial gravity runes
+    for (let px = 20; px < W; px += 44) {
+      path(g, [{ x: px, y: 18 }, { x: px + 12, y: 32 }, { x: px, y: 46 }], 0xa855f7, 0.8, 2.5);
+      path(g, [{ x: px + 24, y: 18 }, { x: px + 12, y: 32 }, { x: px + 24, y: 46 }], 0x7e22ce, 0.8, 2.5);
+    }
+    bandRect(g, 0, 0, W, 14, 0x3b0764, 0x150726, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xf3e8ff, 0.95, 2.5);
+    path(g, [{ x: 0, y: 14 }, { x: W, y: 14 }], 0xa855f7, 0.85, 2);
+  });
+
+  // Arena Boundary Wall (Impassable void portcullis)
+  forge(scene, 'platform_l4_arena_wall', 48, 380, (g) => {
+    bandRect(g, 0, 0, 48, 380, 0x160824, 0x090212, 25);
+    for (let py = 20; py < 380; py += 38) {
+      poly(g, [{ x: 6, y: py }, { x: 24, y: py + 12 }, { x: 42, y: py }, { x: 24, y: py + 18 }], 0xa855f7, 0.75);
+    }
+    g.lineStyle(2, 0x3b0764, 0.9);
+    g.strokeRect(2, 2, 44, 376);
+  });
+
+  // Vertical Anti-Grav Pylon Strut
+  forge(scene, 'platform_l4_pylon', 48, 260, (g) => {
+    bandRect(g, 0, 0, 48, 260, 0x22133b, 0x0f071e, 20);
+    g.lineStyle(2, 0xa855f7, 0.8);
+    g.strokeRect(2, 2, 44, 256);
+    for (let py = 20; py < 260; py += 32) {
+      g.fillStyle(0xc084fc, 0.85);
+      g.fillCircle(24, py, 3);
+    }
+  });
+
+  // Gravitas Anchor Idle
+  forge(scene, 'gravitas_anchor_idle', 44, 44, (g) => {
+    g.fillStyle(0x2e104d, 0.9);
+    g.fillCircle(22, 22, 20);
+    g.lineStyle(2.5, 0xc084fc, 0.95);
+    g.strokeCircle(22, 22, 18);
+    g.fillStyle(0xd8b4fe, 0.95);
+    g.fillCircle(22, 22, 8);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(22, 22, 3);
+  });
+}
+
 /* ---------------------------------------------------------------------------
    Entry point
    --------------------------------------------------------------------------- */
@@ -1078,5 +1211,6 @@ export function buildAllRealms(scene: Phaser.Scene) {
   Object.values(REALMS).forEach((env) => buildRealm(scene, env));
   buildLevel2Materials(scene);
   buildLevel3Materials(scene);
+  buildLevel4Materials(scene);
 }
 

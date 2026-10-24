@@ -253,7 +253,7 @@ export const LEVELS: Record<number, LevelConfig> = {
       groundTop: GROUND_TOP,
       playerSpawnX: 190,
       bossSpawnX: 7850,
-      arenaStartX: 7000,
+      arenaStartX: 7150,
       hasLava: true,
 
       platforms: [
@@ -282,9 +282,7 @@ export const LEVELS: Record<number, LevelConfig> = {
         // ---- STAGE 5: THE ENTROPY NEXUS (x: 5600 - 7000) ----
         // Ascending core elevator lifting player to central dais
         { x: 6050, y: 580, width: 170, behaviour: 'moving', travelY: -160, travelMs: 2000, textureKey: 'platform_l2_nexus' },
-        // Collapsing heat shield spans
-        { x: 6680, y: 480, width: 160, behaviour: 'collapsing', textureKey: 'platform_l2_nexus' },
-        { x: 6830, y: 520, width: 160, behaviour: 'collapsing', textureKey: 'platform_l2_nexus' },
+        // Hard-light conduit energy bridge across the thermal breach is managed in Level2Architecture (unlocked at console x:6420)
 
         // ---- STAGE 6: THE LAST WARDEN (x: 7000 - 8600) ----
         // Solid continuous arena floor and tactical architectural balconies built in Level2Architecture
@@ -360,7 +358,7 @@ export const LEVELS: Record<number, LevelConfig> = {
         { kind: 'laser_gate', x: 6300, y: GROUND_TOP, width: 14, height: 260, warnMs: 600, activeMs: 800, cooldownMs: 1200, offsetMs: 300 },
         // STAGE 5: Nexus corruption surge pool
         { kind: 'corruption_zone', x: 5850, y: GROUND_TOP, width: 200, warnMs: 600, activeMs: 1000, cooldownMs: 1300, offsetMs: 0 },
-        // STAGE 5: Nexus Reroute Console
+        // STAGE 5: Nexus Reroute Console (upper dais)
         {
           kind: 'terminal',
           x: 6420,
@@ -368,6 +366,16 @@ export const LEVELS: Record<number, LevelConfig> = {
           width: 48,
           label: 'NEXUS_REROUTE',
           prompt: '[E] REROUTE NEXUS ENERGY',
+          eventKey: 'nexus-rerouted',
+        },
+        // STAGE 5: Sanctum Portcullis Console (right in front of the gate at x: 6940)
+        {
+          kind: 'terminal',
+          x: 6940,
+          y: 580,
+          width: 48,
+          label: 'SANCTUM_OVERRIDE',
+          prompt: '[E] OVERRIDE SANCTUM PORTCULLIS',
           eventKey: 'nexus-rerouted',
         },
       ],
@@ -447,19 +455,26 @@ export const LEVELS: Record<number, LevelConfig> = {
       groundTop: GROUND_TOP,
       playerSpawnX: 180,
       bossSpawnX: 7800,
-      arenaStartX: 7000,
+      arenaStartX: 7150,
       hasLava: false,
 
-      // Solid continuous terrain built natively in Level3Architecture
-      platforms: [],
+      platforms: [
+        // ---- STAGE 3: THE HOLLOW COLOSSUS (x: 2800 - 4200) ----
+        // Motorized Bio-Elevator ascending vertical hollow trunk
+        { x: 3280, y: 648, width: 180, behaviour: 'moving', travelY: -220, travelMs: 2400, textureKey: 'platform_l3_colossus_floor' },
+
+        // ---- STAGE 5: THE BIOSPHERE CRUCIBLE (x: 5600 - 7000) ----
+        // Motorized Seed Pod ferry traversing crucible breach
+        { x: 6250, y: 530, width: 180, behaviour: 'moving', travelX: 180, travelMs: 2400, textureKey: 'platform_l3_crucible' },
+      ],
 
       // Biological chasms separating structural sectors
       gaps: [
-        [840, 1060],   // Stage 1: Living Root Chasm (spanned by canopy branch & pull anchor)
-        [1820, 2260],  // Stage 2: Acid Spore Chasm (spanned by transfer swing & mid canopy)
-        [3200, 3660],  // Stage 3: Hollow Colossus Shaft (spanned by bio-lift & core balcony)
-        [5140, 5480],  // Stage 4: Sanctuary Chasm (spanned by blooming light-bridge)
-        [6040, 6460],  // Stage 5: Crucible Chasm (spanned by phasing bio-light bridges)
+        [860, 1060],   // Stage 1: Living Root Chasm (spanned by stepping root shelves)
+        [1820, 2260],  // Stage 2: Acid Spore Chasm (spanned by canopy route & lower recovery shelf)
+        [3200, 3660],  // Stage 3: Hollow Colossus Shaft (spanned by bio-elevator & interior decks)
+        [5140, 5480],  // Stage 4: Sanctuary Chasm (spanned by blooming light-bridge & root arch)
+        [6040, 6460],  // Stage 5: Crucible Chasm (spanned by seed pod ferry & braided conduits)
       ],
 
       staticHazards: [
@@ -481,22 +496,22 @@ export const LEVELS: Record<number, LevelConfig> = {
         // STAGE 3: High output Bio-Laser conduit
         { kind: 'laser_gate', x: 3900, y: GROUND_TOP, width: 14, height: 260, warnMs: 650, activeMs: 850, cooldownMs: 1300, offsetMs: 0 },
 
-        // STAGE 4: Interactive Heartroot Console
+        // STAGE 4: Interactive Heartroot Console (seated atop sanctuary altar platform)
         {
           kind: 'terminal',
           x: 4850,
-          y: 440,
+          y: 500,
           width: 48,
           label: 'HEARTROOT_HARMONIZE',
           prompt: '[E] HARMONIZE HEARTROOT CONDUIT',
           eventKey: 'heartroot-harmonized',
         },
 
-        // STAGE 5: Crucible Overcharge Console
+        // STAGE 5: Crucible Overcharge Console (seated on dais ground)
         {
           kind: 'terminal',
           x: 6720,
-          y: 420,
+          y: GROUND_TOP,
           width: 48,
           label: 'WORLDS EED_CONTAINMENT',
           prompt: '[E] DISENGAGE WORLDS EED CONTAINMENT',
@@ -565,61 +580,120 @@ export const LEVELS: Record<number, LevelConfig> = {
   },
 
   /* =========================================================================
-     IV — FROZEN OBSERVATORY
-     Pattern recognition: phasing platforms you must read before committing.
+     IV — THE VOIDBORN ABYSS
+     Six-Stage Campaign · Gravity Manipulation · Dimensional Combat
      ========================================================================= */
   4: {
     id: 4,
-    name: 'FROZEN OBSERVATORY',
-    subtitle: 'Realm IV — Secrets Hidden in Eternal Silence',
-    objective: 'Time the frozen light-bridges and reach the observatory core.',
-    playerHealth: 3,
-    bossHealth: 9,
+    name: 'THE VOIDBORN ABYSS',
+    subtitle: 'Realm IV — Gravity Anomalies of the Shattered Core',
+    objective: 'Harness Gravitas, cross the inverted megacity, and stabilize the void rifts.',
+    playerHealth: 4,
+    bossHealth: 10,
     gravity: 1750,
-    openingTaunt: '"This silence has outlasted better guardians than you."',
+    openingTaunt: '"The anomaly has consumed better guardians than you. The Void Sovereign shall claim your light."',
     environment: REALMS[4],
-    difficulty: { bossTempoScale: 0.92, hazardWarnScale: 1.0, relicSpawnSeconds: 14 },
+    difficulty: { bossTempoScale: 1.12, hazardWarnScale: 1.2, relicSpawnSeconds: 12 },
     arena: {
-      worldWidth: 4000,
+      worldWidth: 8600,
       groundTop: GROUND_TOP,
-      playerSpawnX: 190,
-      bossSpawnX: 3420,
-      arenaStartX: 2260,
+      playerSpawnX: 180,
+      bossSpawnX: 7850,
+      arenaStartX: 7150,
       hasLava: false,
+
       platforms: [
-        { x: 620, y: 540, width: 240 },
-        // Three bridges alternating on a 1.8s/1.2s cycle, staggered so a
-        // patient player always has a next surface arriving.
-        { x: 940, y: 505, width: 190, behaviour: 'phasing', phaseOnMs: 1800, phaseOffMs: 1200, phaseOffsetMs: 0 },
-        { x: 1260, y: 480, width: 190, behaviour: 'phasing', phaseOnMs: 1800, phaseOffMs: 1200, phaseOffsetMs: 1000 },
-        { x: 1580, y: 505, width: 190, behaviour: 'phasing', phaseOnMs: 1800, phaseOffMs: 1200, phaseOffsetMs: 2000 },
-        { x: 1900, y: 460, width: 220, behaviour: 'moving', travelY: -140, travelMs: 2400 },
-        { x: 2140, y: 520, width: 220 },
-        // Arena
-        { x: 2540, y: 492, width: 280 },
-        { x: 3000, y: 418, width: 300 },
-        { x: 3500, y: 492, width: 280 },
+        // STAGE 1: Motorized Exit Lift
+        { x: 1360, y: GROUND_TOP, width: 180, travelY: -220, travelMs: 2500, textureKey: 'platform_l4_void' },
+
+        // STAGE 2: Heavy Anti-Grav Freight Lift
+        { x: 2060, y: 540, width: 180, travelY: -220, travelMs: 2400, textureKey: 'platform_l4_megacity' },
+
+        // STAGE 4: Collapsing Crystal Bridge
+        { x: 5360, y: 550, width: 220, behaviour: 'collapsing', collapseDelayMs: 850, textureKey: 'platform_l4_cataclysm' },
       ],
-      gaps: [[780, 1060], [1400, 1700]],
+
+      gaps: [
+        [420, 560],   // Stage 1: Broken approach chasm (140px jump)
+        [2480, 2750], // Stage 2: Inverted megacity chasm (spanned by Gravitas bridge)
+        [3520, 3840], // Stage 3: Rift ravine (spanned by destructible monolith and crystal ramp)
+        [5280, 5460], // Stage 4: Cataclysm chasm (spanned by collapsing crystal bridge)
+        [5940, 6620], // Stage 5: Devouring singularity chasm (spanned by anti-singularity decks)
+      ],
+
       staticHazards: [
-        { kind: 'laser_gate', x: 1260, y: GROUND_TOP, width: 14, height: 260, warnMs: 600, activeMs: 800, cooldownMs: 1100, offsetMs: 400 },
-        { kind: 'spikes', x: 2040, y: GROUND_TOP, width: 200 },
-        { kind: 'corruption_zone', x: 1700, y: GROUND_TOP, width: 240, warnMs: 700, activeMs: 1100, cooldownMs: 1600, offsetMs: 0 },
+        // STAGE 1: Laser barrier
+        { kind: 'laser_gate', x: 1200, y: GROUND_TOP, width: 14, height: 260, warnMs: 600, activeMs: 900, cooldownMs: 1400, offsetMs: 0 },
+
+        // STAGE 3: Dimensional Rift Barrier (dispelled by disrupting Rift 1)
+        { kind: 'laser_gate', x: 3500, y: GROUND_TOP, width: 18, height: 260, guardGroup: 'rift1_guard' },
+
+        // STAGE 4: Timed Crystal Eruption Hazards
+        { kind: 'corruption_zone', x: 4600, y: GROUND_TOP, width: 180, warnMs: 800, activeMs: 1000, cooldownMs: 1200, offsetMs: 0 },
+        { kind: 'corruption_zone', x: 4800, y: GROUND_TOP, width: 180, warnMs: 800, activeMs: 1000, cooldownMs: 1200, offsetMs: 400 },
+        { kind: 'corruption_zone', x: 5200, y: GROUND_TOP, width: 180, warnMs: 800, activeMs: 1000, cooldownMs: 1200, offsetMs: 800 },
+
+        // STAGE 4: Containment Stabilizer Terminal
+        {
+          kind: 'terminal',
+          x: 5520,
+          y: 520,
+          width: 48,
+          label: 'CRYSTAL_STABILIZER',
+          prompt: '[E] STABILIZE CRYSTAL NETWORK',
+          eventKey: 'crystal-stabilized',
+        },
+
+        // STAGE 5: Singularity Containment Terminal
+        {
+          kind: 'terminal',
+          x: 6860,
+          y: 520,
+          width: 48,
+          label: 'SINGULARITY_CONTAINMENT',
+          prompt: '[E] OVERRIDE CONTAINMENT PYLONS',
+          eventKey: 'pylons-overloaded',
+        },
       ],
+
       pickups: [
-        { x: 1260, y: 414, type: 'aegis_olympus' },
-        { x: 1900, y: 394, type: 'thunderheart' },
+        // Stage 1: Elevated observation shelf
+        { x: 680, y: 470, type: 'hermes_step' },
+        // Stage 2: High tower balcony
+        { x: 2220, y: 260, type: 'aegis_olympus' },
+        // Stage 3: Crystal ridge balcony
+        { x: 4140, y: 420, type: 'thunderheart' },
+        // Stage 4: Resonating node shelf
+        { x: 5160, y: 380, type: 'rune_of_ruin' },
+        // Stage 5: Containment deck
+        { x: 6380, y: 340, type: 'overdrive_shard' },
+        // Stage 6: Central arena grapple
+        { x: 7800, y: 220, type: 'phoenix_core' },
       ],
-      // Mostly ranged pressure here, deliberately: a melee drone chasing the
-      // player across the phasing bridges or the vertical lift risks knocking
-      // them into a gap mid-timing-puzzle, which is a different (unfair) kind
-      // of difficulty than "read the pattern." One drone sits on the single
-      // stretch of genuinely solid ground instead; seekers watch the two
-      // precision sections from range without closing in.
+
       enemies: [
-        { kind: 'drone', x: 1150, y: GROUND_TOP - 60, patrolMin: 1080, patrolMax: 1380 },
-        { kind: 'seeker', x: 1550, y: 320 },
-        { kind: 'seeker', x: 1900, y: 280 },
+        // Stage 1: Breach Beyond patrol
+        { kind: 'void_drone', x: 1140, y: 380 },
+        { kind: 'void_drone', x: 1280, y: 340 },
+
+        // Stage 2: Inverted Megacity garrison
+        { kind: 'void_drone', x: 1650, y: 320, guardGroup: 'megacity_guard' },
+        { kind: 'void_drone', x: 2420, y: 220, guardGroup: 'megacity_guard' },
+
+        // Stage 3: Riftborn Hunt defenders
+        { kind: 'rift_stalker', x: 3080, y: GROUND_TOP - 60, patrolMin: 2950, patrolMax: 3250 },
+        { kind: 'rift_stalker', x: 3380, y: GROUND_TOP - 60, guardGroup: 'rift1_guard' },
+        { kind: 'rift_stalker', x: 3960, y: GROUND_TOP - 60, patrolMin: 3860, patrolMax: 4120 },
+        { kind: 'void_drone', x: 4140, y: 340 },
+
+        // Stage 4: Crystal Cataclysm defenders
+        { kind: 'gravity_sentinel', x: 5120, y: GROUND_TOP - 60, patrolMin: 4980, patrolMax: 5240 },
+        { kind: 'void_drone', x: 4820, y: 360 },
+
+        // Stage 5: Singularity Vanguard
+        { kind: 'gravity_sentinel', x: 5820, y: GROUND_TOP - 60, patrolMin: 5680, patrolMax: 5920 },
+        { kind: 'void_drone', x: 6220, y: 340 },
+        { kind: 'rift_stalker', x: 6760, y: GROUND_TOP - 60, patrolMin: 6640, patrolMax: 6920 },
       ],
     },
     bossMechanics: {
@@ -628,10 +702,10 @@ export const LEVELS: Record<number, LevelConfig> = {
       hasCharged: true,
       hasHazards: true,
       hasBeams: true,
-      canTeleport: false,
-      attackIntervalMin: 950,
-      attackIntervalMax: 1350,
-      projectileSpeedScale: 1.1,
+      canTeleport: true,
+      attackIntervalMin: 900,
+      attackIntervalMax: 1300,
+      projectileSpeedScale: 1.15,
     },
   },
 
@@ -685,7 +759,7 @@ export const LEVELS: Record<number, LevelConfig> = {
       // pressure layers the same way: two drones holding the two solid-
       // ground stretches between the three gaps, and two seekers watching
       // the phasing-bridge section and the final approach to the arena gate
-      // from range, same fairness rule as Frozen Observatory (ranged only
+      // from range, same fairness rule as The Voidborn Abyss (ranged only
       // near precision terrain, melee only on genuinely solid ground).
       enemies: [
         { kind: 'drone', x: 1150, y: GROUND_TOP - 60, patrolMin: 1090, patrolMax: 1330 },

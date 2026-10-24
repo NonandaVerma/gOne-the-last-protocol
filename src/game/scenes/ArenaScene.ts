@@ -18,7 +18,9 @@ import { ArenaGeometry, LevelConfig, REALM_COUNT } from '../types/game';
 import { PowerUpManager, PowerUpPickup } from '../entities/PowerUp';
 import { Level2Architecture } from '../systems/Level2Architecture';
 import { Level3Architecture } from '../systems/Level3Architecture';
+import { Level4Architecture } from '../systems/Level4Architecture';
 import { RootlineManager } from '../systems/RootlineManager';
+import { GravitasManager } from '../systems/GravitasManager';
 import { LevelState } from '../systems/LevelState';
 
 /**
@@ -50,6 +52,7 @@ export class ArenaScene extends Phaser.Scene {
   private backdrop?: Backdrop;
   private juice?: Juice;
   private rootlineManager?: RootlineManager;
+  private gravitasManager?: GravitasManager;
 
   private isPaused = false;
   private isLevelEnding = false;
@@ -121,6 +124,7 @@ export class ArenaScene extends Phaser.Scene {
       objective: config.objective,
     });
     SaveManager.saveUnlockedLevel(this.currentLevel);
+    SaveManager.setLastLevel(this.currentLevel);
   }
 
   create() {
@@ -176,7 +180,12 @@ export class ArenaScene extends Phaser.Scene {
         const urlStage = p.get('stage');
         if (urlStage) {
           const stNum = parseInt(urlStage, 10);
-          if (this.currentLevel === 3) {
+          if (this.currentLevel === 4) {
+            const stageStarts = [180, 1560, 2980, 4370, 5770, 7200];
+            if (stNum >= 1 && stNum <= 6) {
+              spawnX = stageStarts[stNum - 1];
+            }
+          } else if (this.currentLevel === 3) {
             const stageStarts = [180, 1600, 3000, 4400, 5800, 7200];
             if (stNum >= 1 && stNum <= 6) {
               spawnX = stageStarts[stNum - 1];
@@ -210,6 +219,9 @@ export class ArenaScene extends Phaser.Scene {
     if (this.currentLevel === 3) {
       this.rootlineManager = new RootlineManager(this, this.player, this.juice);
       Level3Architecture.buildAnchors(this.rootlineManager);
+    } else if (this.currentLevel === 4) {
+      this.gravitasManager = new GravitasManager(this, this.player, this.juice);
+      Level4Architecture.buildAnchors(this.gravitasManager);
     }
 
     this.staticHazards = new StaticHazardField(
@@ -273,7 +285,7 @@ export class ArenaScene extends Phaser.Scene {
       this.enterArena(config, true);
     } else {
       this.announceObjective(config.objective);
-      if (this.currentLevel === 1 || this.currentLevel === 2) {
+      if (this.currentLevel === 1 || this.currentLevel === 2 || this.currentLevel === 3 || this.currentLevel === 4) {
         this.time.delayedCall(400, () => {
           this.checkStageProgression(spawnX);
         });
@@ -302,6 +314,10 @@ export class ArenaScene extends Phaser.Scene {
     }
     if (this.currentLevel === 3) {
       Level3Architecture.build(this, this.platforms, this.dynamicPlatforms!, arena);
+      return;
+    }
+    if (this.currentLevel === 4) {
+      Level4Architecture.build(this, this.platforms, this.dynamicPlatforms!, arena);
       return;
     }
 
@@ -336,7 +352,7 @@ export class ArenaScene extends Phaser.Scene {
 
   /** Only plain surfaces here; dynamic ones are owned by DynamicPlatformManager. */
   private createStaticPlatforms(arena: ArenaGeometry) {
-    if (!this.platforms || this.currentLevel === 2 || this.currentLevel === 3) return;
+    if (!this.platforms || this.currentLevel === 2 || this.currentLevel === 3 || this.currentLevel === 4) return;
     const defaultKey = `platform_l${this.currentLevel}`;
     const tile = this.textures.get(defaultKey).getSourceImage();
     const defaultTileW = (tile as { width?: number }).width || 256;
@@ -445,6 +461,8 @@ export class ArenaScene extends Phaser.Scene {
     this.arenaEntered = true;
     this.startedAtCheckpoint = true;
 
+    EventBus.emit('arena-entered', { level: this.currentLevel, immediate });
+
     if (this.boss && this.player) {
       this.boss.activate(this.player, immediate ? 1500 : 1900);
       this.boss.setTarget(this.player);
@@ -472,7 +490,7 @@ export class ArenaScene extends Phaser.Scene {
       if (this.boss?.active) {
         EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
           text: config.openingTaunt,
-          speaker: this.currentLevel === 3 ? 'THE WORLDSEED GUARDIAN' : this.currentLevel === 2 ? 'THE LAST WARDEN' : 'RA-ONE',
+          speaker: this.currentLevel === 4 ? 'THE VOID SOVEREIGN' : this.currentLevel === 3 ? 'THE WORLDSEED GUARDIAN' : this.currentLevel === 2 ? 'THE LAST WARDEN' : 'RA-ONE',
           priority: 2,
         });
       }
@@ -709,6 +727,29 @@ export class ArenaScene extends Phaser.Scene {
         AudioManager.getInstance().playOverdrive();
         return;
       }
+
+      if (this.currentLevel === 4) {
+        const phaseNames = ['', 'THE GUARDIAN', 'GRAVITY SHIFT', 'EXPOSED CORE'];
+        const phaseName = phaseNames[data.phase] ?? 'SINGULARITY COLLAPSE';
+        EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+          label: 'VOID SOVEREIGN',
+          value: `PHASE ${data.phase} // ${phaseName}`,
+          alert: true,
+        });
+        EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+          text: data.phase === 2
+            ? 'THE VOID SOVEREIGN ACTIVATES GRAVITY SHIFT MATRIX. Watch for gravitational anomalies!'
+            : 'GRAVITATIONAL CORE EXPOSED. Disrupt the core anchors during the vulnerability window!',
+          speaker: 'THE VOID SOVEREIGN',
+          duration: 3800,
+          priority: 2,
+        });
+        this.juice?.zoomPunch(0.05, 260);
+        this.juice?.flash(0xc084fc, 0.4, 300);
+        this.juice?.shake(0.018, 380);
+        AudioManager.getInstance().playOverdrive();
+        return;
+      }
       if (this.currentLevel !== 6 || this.finaleEscalated || data.phase < 3) return;
       this.finaleEscalated = true;
       this.juice?.zoomPunch(0.05, 260);
@@ -764,15 +805,17 @@ export class ArenaScene extends Phaser.Scene {
     };
 
     const onNexusRerouted = () => {
+      this.juice?.shake(0.015, 350);
+      AudioManager.getInstance().playRelicCollect();
       EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
-        label: 'CORRUPTION SURGE',
-        value: 'SURGE REROUTED',
+        label: 'NEXUS CONDUIT',
+        value: 'POWER REROUTED // BRIDGE ACTIVE',
         alert: false,
       });
       EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-        text: 'Nexus power rerouted to primary conduit. Guardian chamber unsealed.',
+        text: 'Nexus power rerouted! Hard-light conduit bridge activated and Sanctum Gate unsealed.',
         speaker: 'SYSTEM',
-        duration: 3500,
+        duration: 4500,
         priority: 2,
       });
     };
@@ -956,13 +999,26 @@ export class ArenaScene extends Phaser.Scene {
 
     if (this.currentLevel === 3) {
       EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-        text: "The Worldseed Guardian yields. The living biosphere stabilizes! Transitioning to Realm IV — FROZEN OBSERVATORY.",
+        text: "The Worldseed Guardian yields. The living biosphere stabilizes! Transitioning to Realm IV — THE VOIDBORN ABYSS.",
         speaker: 'SYSTEM',
         duration: 3500,
         priority: 2,
       });
       this.time.delayedCall(1200, () => {
         this.showLevelTransition(4, REALM_TRANSITIONS[4] ?? []);
+      });
+      return;
+    }
+
+    if (this.currentLevel === 4) {
+      EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+        text: "The Void Sovereign dissolves into cosmic ether. The gravitational anomaly collapses! Transitioning to Realm V.",
+        speaker: 'SYSTEM',
+        duration: 3500,
+        priority: 2,
+      });
+      this.time.delayedCall(1200, () => {
+        this.showLevelTransition(5, REALM_TRANSITIONS[5] ?? []);
       });
       return;
     }
@@ -1383,7 +1439,7 @@ export class ArenaScene extends Phaser.Scene {
       if (x < 5200) return 4;
       return 5;
     }
-    if (this.currentLevel === 2 || this.currentLevel === 3) {
+    if (this.currentLevel === 2 || this.currentLevel === 3 || this.currentLevel === 4) {
       if (x < 1400) return 1;
       if (x < 2800) return 2;
       if (x < 4200) return 3;
@@ -1395,7 +1451,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private checkStageProgression(playerX: number) {
-    if (this.currentLevel !== 1 && this.currentLevel !== 2 && this.currentLevel !== 3) return;
+    if (this.currentLevel !== 1 && this.currentLevel !== 2 && this.currentLevel !== 3 && this.currentLevel !== 4) return;
     const stage = this.getCurrentStageIndex(playerX);
     if (stage !== this.currentStageIndex) {
       this.currentStageIndex = stage;
@@ -1583,7 +1639,7 @@ export class ArenaScene extends Phaser.Scene {
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 5: THE ENTROPY NEXUS',
-            instruction: 'Ascend moving core elevators and collapsing spans. Rerouting the terminal opens the sanctum gates to the Last Warden.',
+            instruction: 'Ascend moving core elevators to reach the central dais. Rerouting the terminal activates the conduit bridge and opens the sanctum gates.',
             timeout: 6500,
           });
           break;
@@ -1715,6 +1771,114 @@ export class ArenaScene extends Phaser.Scene {
           break;
       }
     }
+
+    if (this.currentLevel === 4) {
+      switch (stage) {
+        case 1:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE I OBJECTIVE',
+            value: 'DISCOVER GRAVITAS ANCHORS [F]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 1: The Breach Beyond — Gravitational instability detected. Approach the Gravity Anchor and press [F] to invert the exit lift.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 1: THE BREACH BEYOND',
+            instruction: 'Approach purple gravity anchors and press [F] or Click to engage Gravitas. Step into vertical updraft wells to float up to high shelves.',
+            timeout: 6500,
+          });
+          break;
+        case 2:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE II OBJECTIVE',
+            value: 'SCALE INVERTED MEGACITY',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 2: The Gravity Graveyard — The alien megacity hangs inverted. Scale the central tower using the anti-grav lift and sling anchor.',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 2: THE GRAVITY GRAVEYARD',
+            instruction: 'Ascend through the vertical anti-grav shaft. Activate the Gravitas Sling [F] to vault across to the suspended bridge.',
+            timeout: 6500,
+          });
+          break;
+        case 3:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE III OBJECTIVE',
+            value: 'COLLAPSE VOID RIFTS [E / F]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 3: The Riftborn Hunt — Hostile dimensional predators emerge from void rifts. Destroy or disrupt the rift anchors to clear the sector.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 3: THE RIFTBORN HUNT',
+            instruction: 'Rift Stalkers lunge aggressively. Target the glowing Dimensional Rift Anchors and press [E / F] to collapse the rifts and unseal the path.',
+            timeout: 6500,
+          });
+          break;
+        case 4:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE IV OBJECTIVE',
+            value: 'STABILIZE CRYSTAL NETWORK [E]',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 4: The Crystal Cataclysm — Tectonic crystal eruptions detected. Time your crossing between eruption cycles and reach the stabilizer console.',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 4: THE CRYSTAL CATACLYSM',
+            instruction: 'Watch for the 0.8s warning glow before crystal eruptions pierce the ground. Dash across collapsing crystal bridges before they shatter.',
+            timeout: 6500,
+          });
+          break;
+        case 5:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE V OBJECTIVE',
+            value: 'SURVIVE SINGULARITY PULL',
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 5: The Devouring Singularity — The gravitational core is collapsing toward the abyss. Deploy Anti-Singularity Bubbles [F] to cross.',
+            speaker: 'SYSTEM',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 5: THE DEVOURING SINGULARITY',
+            instruction: 'Singularity vortex pulls G-ONE toward the abyss. Activate Anti-Singularity Anchors [F] to deploy stability bubbles that neutralize the gravitational pull.',
+            timeout: 6500,
+          });
+          break;
+        case 6:
+          EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
+            label: 'STAGE VI OBJECTIVE',
+            value: 'DEFEAT THE VOID SOVEREIGN',
+            alert: true,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
+            text: 'Stage 6: The Void Sovereign — The ancient guardian of the gravitational core awakens. Evade gravity fissure surges and disrupt the channeled core!',
+            speaker: 'G-ONE',
+            duration: 5200,
+            priority: 2,
+          });
+          EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
+            title: 'STAGE 6: THE VOID SOVEREIGN',
+            instruction: 'Use elevated tactical balconies to evade ground gravity waves. When the Sovereign channels the core, activate the pylon anchors [E / F] to overload and stun it!',
+            timeout: 7000,
+          });
+          break;
+      }
+    }
   }
 
   update(time: number, delta: number) {
@@ -1722,6 +1886,7 @@ export class ArenaScene extends Phaser.Scene {
     this.powerUps?.update(time, delta);
     this.staticHazards?.update(time, delta);
     this.rootlineManager?.update(time, delta);
+    this.gravitasManager?.update(time, delta);
     if (this.player) {
       this.staticHazards?.checkTrigger(this.player.x);
       if (!this.player.isDead) {

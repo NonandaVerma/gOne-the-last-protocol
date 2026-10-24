@@ -107,15 +107,27 @@ export class Backdrop {
       this.sky = sky;
     }
 
-    // --- Internal sub-stage progression (Realm 1 today) --------------------
-    // Keep only the stages whose texture actually loaded, so one missing or
-    // renamed asset degrades to fewer visible stages instead of silently
-    // disabling the whole feature (an `every()` check previously meant a
-    // single 404 reverted the entire realm to one static backdrop).
+    // --- Internal sub-stage progression & Diagnostics --------------------
+    if (env.stageBackdrops) {
+      const keysSeen = new Set<string>();
+      env.stageBackdrops.forEach((s, idx) => {
+        if (!scene.textures.exists(s.key)) {
+          console.error(`[DIAGNOSTIC ERROR] Realm ${env.id} Stage ${idx + 1} (${s.label}) missing texture: "${s.key}". Ensure asset is registered in PreloadScene.`);
+        }
+        if (keysSeen.has(s.key)) {
+          console.warn(`[DIAGNOSTIC WARN] Realm ${env.id} Stage ${idx + 1} (${s.label}) duplicates texture key: "${s.key}".`);
+        }
+        keysSeen.add(s.key);
+      });
+    }
+
     const loadedStages = env.stageBackdrops?.filter((s) => scene.textures.exists(s.key));
     if (loadedStages && loadedStages.length > 0) {
       this.stages = [...loadedStages].sort((a, b) => a.fromX - b.fromX);
       this.activeStageIndex = 0;
+      if (this.sky && this.stages[0]) {
+        this.sky.setTexture(this.stages[0].key);
+      }
       EventBus.emit(GAME_EVENTS.STAGE_ANNOUNCED, this.stages[0].label);
     }
 

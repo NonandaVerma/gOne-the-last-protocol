@@ -96,6 +96,33 @@ const KIND_CONFIG: Record<EnemyKind, KindConfig> = {
     contactDamage: 2,
     attackCooldownMs: 2000,
   },
+  void_drone: {
+    frame: ENEMY_FRAME.void_drone,
+    health: 3,
+    speed: 120,
+    detectRange: 500,
+    engageRange: 340,
+    contactDamage: 1,
+    attackCooldownMs: 1700,
+  },
+  rift_stalker: {
+    frame: ENEMY_FRAME.rift_stalker,
+    health: 4,
+    speed: 210,
+    detectRange: 450,
+    engageRange: 80,
+    contactDamage: 1,
+    attackCooldownMs: 1400,
+  },
+  gravity_sentinel: {
+    frame: ENEMY_FRAME.gravity_sentinel,
+    health: 6,
+    speed: 80,
+    detectRange: 420,
+    engageRange: 100,
+    contactDamage: 2,
+    attackCooldownMs: 2200,
+  },
 };
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
@@ -279,7 +306,13 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.facing = Math.sign(target.x - this.x) || this.facing;
         this.setFlipX(this.facing > 0);
 
-        if (this.kind === 'drone' || this.kind === 'rootstalker' || this.kind === 'guardian_organism') {
+        if (
+          this.kind === 'drone' ||
+          this.kind === 'rootstalker' ||
+          this.kind === 'guardian_organism' ||
+          this.kind === 'rift_stalker' ||
+          this.kind === 'gravity_sentinel'
+        ) {
           if (distToTarget > this.cfg.engageRange) {
             body.setVelocityX(this.facing * this.cfg.speed);
           } else {
@@ -301,7 +334,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
             if (time >= this.nextAttackAt) this.beginTelegraph();
           }
         } else {
-          // seeker: maintain standoff distance, strafe rather than close in.
+          // seeker & void_drone: maintain standoff distance, strafe rather than close in.
           if (distToTarget < this.cfg.engageRange - 40) {
             body.setVelocityX(-this.facing * this.cfg.speed * 0.6);
           } else if (distToTarget > this.cfg.engageRange + 60) {
@@ -349,7 +382,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   private beginTelegraph() {
     this.transitionTo('telegraph', TELEGRAPH_MS);
-    const tint = this.kind === 'rootstalker' || this.kind === 'sporecaster' ? 0x10b981 : VILLAIN.rim;
+    const isEmerald = this.kind === 'rootstalker' || this.kind === 'sporecaster';
+    const isVoid = this.kind === 'void_drone' || this.kind === 'rift_stalker' || this.kind === 'gravity_sentinel';
+    const tint = isEmerald ? 0x10b981 : isVoid ? 0xa855f7 : VILLAIN.rim;
     this.setTint(tint);
     this.scene.time.delayedCall(TELEGRAPH_MS, () => {
       if (this.active) this.clearTint();
@@ -366,16 +401,40 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       body.setVelocityX(this.facing * this.cfg.speed * 2.6);
       body.setVelocityY(-180);
       AudioManager.getInstance().playDash();
+    } else if (this.kind === 'rift_stalker') {
+      body.setVelocityX(this.facing * this.cfg.speed * 2.8);
+      body.setVelocityY(-200);
+      AudioManager.getInstance().playDash();
+    } else if (this.kind === 'void_drone') {
+      this.fireVoidPlasma();
     } else if (this.kind === 'sporecaster') {
       this.fireSporeMortar();
     } else if (this.kind === 'canopy_hunter') {
       body.setVelocity(this.facing * 340, 240);
       AudioManager.getInstance().playDash();
-    } else if (this.kind === 'guardian_organism') {
+    } else if (this.kind === 'guardian_organism' || this.kind === 'gravity_sentinel') {
       this.slamShockwave();
     } else {
       this.fireAtTarget();
     }
+  }
+
+  private fireVoidPlasma() {
+    if (!this.target || !this.projectiles) return;
+    const dx = this.target.x - this.x;
+    const dy = this.target.y - this.y;
+    const angle = Math.atan2(dy, dx);
+    spawnProjectile(this.projectiles, {
+      x: this.x + Math.cos(angle) * 20,
+      y: this.y + Math.sin(angle) * 20,
+      speed: 380,
+      angle,
+      texture: 'proj_void_plasma',
+      damage: this.cfg.contactDamage,
+      owner: 'boss',
+      lifespan: 2600,
+    });
+    AudioManager.getInstance().playRaOneShoot();
   }
 
   private fireSporeMortar() {

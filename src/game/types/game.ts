@@ -89,6 +89,8 @@ export interface PlatformSpec {
   travelY?: number;
   /** `moving`: one-way traversal time in ms. */
   travelMs?: number;
+  /** `collapsing`: custom delay before platform drops in ms. */
+  collapseDelayMs?: number;
   /** `phasing`: ms visible, then ms absent. */
   phaseOnMs?: number;
   phaseOffMs?: number;
@@ -175,7 +177,13 @@ export type EnemyKind =
   /** Arboreal predator that climbs on elevated canopies and dives down. */
   | 'canopy_hunter'
   /** Elite bio-armored guardian protecting sacred passages. */
-  | 'guardian_organism';
+  | 'guardian_organism'
+  /** Level 4: Floating ranged void drone firing telegraphed plasma orbs. */
+  | 'void_drone'
+  /** Level 4: Aggressive ground predator with dimensional leap. */
+  | 'rift_stalker'
+  /** Level 4: Heavy armored construct with gravitational shielding. */
+  | 'gravity_sentinel';
 
 export interface EnemySpec {
   kind: EnemyKind;

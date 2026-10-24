@@ -206,9 +206,13 @@ export class Level2Architecture {
     addFoundationPier(6280, 464, 70);
     addFoundationPier(6520, 464, 70);
 
-    // 3. Sanctum Threshold (x: 6900 to 7000)
+    // 3. Sanctum Threshold (x: 6870 to 7030)
     addSolidFloor(6950, groundTop, 160, groundThickness, 'platform_l2_nexus');
     addFoundationPier(6950, groundTop + 10, 90);
+
+    // 4. Single approach platform across the Stage 5 chasm (clean, practical approach — no multi-staircases!)
+    addSolidFloor(6740, 490, 200, 32, 'platform_l2_nexus');
+    addFoundationPier(6740, 522, 48);
 
     // =========================================================================
     // STAGE 6 — THE LAST WARDEN BOSS ARENA (x: 7000 - 8600)
@@ -231,24 +235,44 @@ export class Level2Architecture {
     addSolidFloor(8280, 470, 240, 36, 'platform_l2_arena');
     addFoundationPier(8280, 506, 56);
 
-    // 3. Impassable Arena Boundary Walls
-    // West Entrance Wall / Portcullis (x: 7030)
+    // 3. Arena Boundary Walls & Interactive West Portcullis Gate
     const wallKey = scene.textures.exists('platform_l2_arena_wall')
       ? 'platform_l2_arena_wall'
       : 'platform_l2_citadel';
-    const westWall = scene.add.image(7030, groundTop - 180, wallKey);
-    westWall.setDisplaySize(48, 380).setDepth(15).setAlpha(0.95);
+    // West Entrance Portcullis starts raised open so G-One enters without obstruction!
+    const westWall = scene.add.image(7030, 220, wallKey);
+    westWall.setDisplaySize(48, 220).setDepth(15).setAlpha(0.95);
 
     // East Abyss Wall (x: 8570)
     const eastWall = scene.add.image(8570, groundTop - 180, wallKey);
     eastWall.setDisplaySize(48, 380).setDepth(15).setAlpha(0.95);
 
-    // Static physics boundaries for the arena to prevent escaping
-    const westBound = staticPlatforms.create(7020, groundTop - 180, wallKey);
-    westBound.setScale(40 / 256, 380 / 80).setVisible(false).refreshBody();
-
     const eastBound = staticPlatforms.create(8580, groundTop - 180, wallKey);
     eastBound.setScale(40 / 256, 380 / 80).setVisible(false).refreshBody();
+
+    // When G-One enters the boss arena (at arenaStartX = 7150), slam the portcullis shut behind them!
+    let westBoundCreated = false;
+    const onArenaEntered = (data?: { level?: number }) => {
+      if (data && data.level !== undefined && data.level !== 2) return;
+      scene.tweens.killTweensOf(westWall);
+      scene.tweens.add({
+        targets: westWall,
+        y: 470,
+        duration: 400,
+        ease: 'Bounce.easeOut',
+      });
+      if (!westBoundCreated) {
+        westBoundCreated = true;
+        const westBound = staticPlatforms.create(7030, 470, wallKey);
+        westBound.setScale(40 / 256, 220 / 80).setVisible(false).refreshBody();
+      }
+    };
+
+    EventBus.on('arena-entered', onArenaEntered);
+
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      EventBus.off('arena-entered', onArenaEntered);
+    });
 
     // Lava river beneath all chasms
     if (arena.hasLava && scene.textures.exists('lava_surface')) {

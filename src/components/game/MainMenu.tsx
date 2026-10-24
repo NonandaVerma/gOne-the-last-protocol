@@ -57,30 +57,37 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
 
     if (reduced || immediate) {
       EventBus.emit(GAME_EVENTS.START_GAME, { level });
+      window.setTimeout(() => { startedRef.current = false; }, 1000);
       return;
     }
 
     setCharge(1);
     window.setTimeout(() => {
       EventBus.emit(GAME_EVENTS.START_GAME, { level });
+      window.setTimeout(() => { startedRef.current = false; }, 1000);
     }, 550);
   }, []);
 
   /**
    * Start transition. `level` > 1 resumes at a previously unlocked realm.
    *
-   * A realm with a reveal cinematic (currently only Realm 1) plays it before
-   * the seam-charge handoff; realms without footage proceed straight through.
+   * Fresh runs for Realm 1 play the cinematic reveal; resuming an unlocked realm
+   * proceeds straight into gameplay so the player is never trapped in cinematic loops.
    */
-  const initiate = useCallback((level = 1) => {
+  const initiate = useCallback((level = 1, showCinematic = false) => {
     if (startedRef.current) return;
     startedRef.current = true;
+
+    // Safety timeout: release lock after 2.5s so button never gets permanently stuck
+    window.setTimeout(() => {
+      startedRef.current = false;
+    }, 2500);
 
     const audio = AudioManager.getInstance();
     audio.init();
     audio.resume();
 
-    if (getRealmReveal(level)) {
+    if (showCinematic && getRealmReveal(level)) {
       setRevealLevel(level);
       return;
     }
@@ -92,7 +99,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
   useEffect(() => {
     setMounted(true);
     setIsMuted(AudioManager.getInstance().isMuted());
-    const savedLevel = SaveManager.getUnlockedLevel();
+    const savedLevel = Math.max(SaveManager.getLastLevel(), SaveManager.getUnlockedLevel());
     setUnlockedLevel(savedLevel);
     setIsFullscreen(Boolean(document.fullscreenElement));
 
@@ -100,8 +107,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
       const params = new URLSearchParams(window.location.search);
       const lvlParam = parseInt(params.get('level') ?? '', 10);
       if (lvlParam >= 1 && lvlParam <= 6) {
-        SaveManager.saveUnlockedLevel(Math.max(savedLevel, lvlParam));
-        setUnlockedLevel(Math.max(savedLevel, lvlParam));
+        SaveManager.setLastLevel(lvlParam);
+        setUnlockedLevel(lvlParam);
       }
     } catch (_) {}
 
@@ -116,6 +123,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     proceedToGame(level, true);
   }, [revealLevel, proceedToGame]);
 
+  const canContinue = mounted && unlockedLevel > 1;
+  const continueName = LEVELS[unlockedLevel]?.name ?? '';
+
   /* "PRESS ANY KEY TO BEGIN" — honour the promise printed in the key art. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -123,12 +133,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
       if (showTrailer || showHowToPlay || startedRef.current || revealLevel !== null) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        initiate(1);
+        initiate(unlockedLevel, unlockedLevel === 1 && !canContinue);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [initiate, showTrailer, showHowToPlay, revealLevel]);
+  }, [initiate, showTrailer, showHowToPlay, revealLevel, canContinue, unlockedLevel]);
 
   const toggleSound = () => setIsMuted(AudioManager.getInstance().toggleMute());
 
@@ -147,9 +157,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     setUnlockedLevel(1);
     setShowResetConfirm(false);
   };
-
-  const canContinue = mounted && unlockedLevel > 1;
-  const continueName = LEVELS[unlockedLevel]?.name ?? '';
 
   return (
     <div className="absolute inset-0 z-30 overflow-hidden select-none">
@@ -299,7 +306,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
           <ProtocolButton
             variant="order"
             size="lg"
-            onClick={() => initiate(1)}
+            onClick={() => initiate(1, true)}
             trailing={<ChevronRight className="w-5 h-5" />}
             className="animate-rise-in min-w-[280px]"
             style={{ animationDelay: '120ms' }}
@@ -311,10 +318,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
             className="flex flex-wrap items-center justify-center gap-2.5 animate-rise-in"
             style={{ animationDelay: '200ms' }}
           >
-            {/* Resuming is progression, not an Entropy action — crimson is
-                reserved for destructive and corruption-aligned controls. */}
             {canContinue && (
-              <ProtocolButton variant="neutral" size="md" onClick={() => initiate(unlockedLevel)}>
+              <ProtocolButton
+                variant="neutral"
+                size="md"
+                onClick={() => initiate(unlockedLevel, false)}
+              >
                 Continue · Realm {unlockedLevel}
                 {continueName && (
                   <span className="hidden md:inline text-muted/70 normal-case font-normal ml-2">
@@ -324,12 +333,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
               </ProtocolButton>
             )}
 
-            {/* Only surfaced once there is saved progress to clear — a
-                returning player's explicit way to play from Realm 1 without
-                "Initiate Protocol" silently leaving Realm 4 banked underneath.
-                Rest state matches the other secondary actions (Teaser, How to
-                Play); the destructive step lives in the confirm modal, not
-                the idle button colour. */}
             {canContinue && (
               <ProtocolButton
                 variant="neutral"

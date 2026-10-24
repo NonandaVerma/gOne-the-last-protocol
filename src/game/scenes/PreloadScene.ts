@@ -62,8 +62,17 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('bg_realm3_stage5', '/images/level3-stage5.png'); // The Biosphere Crucible
     this.load.image('bg_realm3_stage6', '/images/level-3-stage6.png'); // The Worldseed Guardian
 
-    this.load.image('bg_realm4', '/images/bg_realm4.png');    // Moonlit Citadel of the Frozen Sky
-    this.load.image('bg_realm5', '/images/bg_victory.png');   // Celestial Forest Sanctuary
+    /* Realm 4's six-stage internal progression (The Breach Beyond -> The Gravity Graveyard ->
+       The Riftborn Hunt -> The Crystal Cataclysm -> The Devouring Singularity -> The Void Sovereign). */
+    this.load.image('bg_realm4', '/images/level4-stage1.png');        // The Voidborn Abyss default
+    this.load.image('bg_realm4_stage1', '/images/level4-stage1.png'); // The Breach Beyond
+    this.load.image('bg_realm4_stage2', '/images/level4-stage2.png'); // The Gravity Graveyard
+    this.load.image('bg_realm4_stage3', '/images/level4-stage3.png'); // The Riftborn Hunt
+    this.load.image('bg_realm4_stage4', '/images/level4-stage4.png'); // The Crystal Cataclysm
+    this.load.image('bg_realm4_stage5', '/images/level4-stage5.png'); // The Devouring Singularity
+    this.load.image('bg_realm4_stage6', '/images/level4-stage6.png'); // The Void Sovereign
+
+    this.load.image('bg_realm5', '/images/Six Realms of the Shattered Protocol.png'); // Celestial Forest Sanctuary
     this.load.image('bg_realm6', '/images/Six Realms of the Shattered Protocol.png'); // Final Arena
 
     this.load.on('progress', (value: number) => {

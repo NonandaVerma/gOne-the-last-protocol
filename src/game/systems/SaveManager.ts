@@ -2,6 +2,18 @@ import { GameSettings } from '../types/game';
 
 const SETTINGS_KEY = 'gone_protocol_settings_v1';
 const PROGRESS_KEY = 'gone_protocol_progress_v1';
+const LAST_LEVEL_KEY = 'gone_protocol_last_level_v1';
+
+const PROGRESS_KEYS = [
+  'gone_protocol_last_level_v1',
+  'gone_protocol_progress_v1',
+  'gone_protocol_progress',
+  'gone_protocol_level',
+  'gone_last_level',
+  'gone_level',
+  'last_level',
+  'unlocked_level',
+];
 
 export const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 0.8,
@@ -34,13 +46,49 @@ export class SaveManager {
     }
   }
 
+  /** Returns highest unlocked level across all fallback keys. */
   public static getUnlockedLevel(): number {
     if (typeof window === 'undefined') return 1;
     try {
-      const level = localStorage.getItem(PROGRESS_KEY);
-      return level ? parseInt(level, 10) || 1 : 1;
+      let highest = 1;
+      for (const key of PROGRESS_KEYS) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          const parsed = parseInt(val, 10);
+          if (parsed >= 1 && parsed <= 6 && parsed > highest) {
+            highest = parsed;
+          }
+        }
+      }
+      return highest;
     } catch {
       return 1;
+    }
+  }
+
+  /** Returns the most recently attempted or selected realm level. */
+  public static getLastLevel(): number {
+    if (typeof window === 'undefined') return 1;
+    try {
+      const last = localStorage.getItem(LAST_LEVEL_KEY);
+      if (last) {
+        const parsed = parseInt(last, 10);
+        if (parsed >= 1 && parsed <= 6) return Math.max(parsed, this.getUnlockedLevel());
+      }
+      return this.getUnlockedLevel();
+    } catch {
+      return 1;
+    }
+  }
+
+  /** Saves the player's last attempted level and updates progression. */
+  public static setLastLevel(level: number) {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(LAST_LEVEL_KEY, level.toString());
+      this.saveUnlockedLevel(level);
+    } catch (e) {
+      console.warn('Failed to save last level:', e);
     }
   }
 
@@ -48,9 +96,9 @@ export class SaveManager {
     if (typeof window === 'undefined') return;
     try {
       const current = this.getUnlockedLevel();
-      if (level > current) {
-        localStorage.setItem(PROGRESS_KEY, level.toString());
-      }
+      const highest = Math.max(current, level);
+      localStorage.setItem(PROGRESS_KEY, highest.toString());
+      localStorage.setItem(LAST_LEVEL_KEY, highest.toString());
     } catch (e) {
       console.warn('Failed to save progress to localStorage:', e);
     }
@@ -60,6 +108,10 @@ export class SaveManager {
     if (typeof window === 'undefined') return;
     try {
       localStorage.removeItem(PROGRESS_KEY);
+      localStorage.removeItem(LAST_LEVEL_KEY);
+      for (const k of PROGRESS_KEYS) {
+        localStorage.removeItem(k);
+      }
     } catch {}
   }
 }

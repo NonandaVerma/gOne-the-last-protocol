@@ -68,15 +68,24 @@ export class Level3Architecture {
     addRootPier(120, groundTop + 10, 80);
     addRootPier(320, groundTop + 10, 80);
 
-    // 2. Living Root Causeway (x: 420 to 840)
-    addSolidFloor(630, groundTop, 420, groundThickness, 'platform_l3_root');
+    // 2. Living Root Causeway (x: 420 to 860)
+    addSolidFloor(640, groundTop, 440, groundThickness, 'platform_l3_root');
     addRootPier(540, groundTop + 10, 84);
     addRootPier(740, groundTop + 10, 84);
 
-    // 3. High Canopy Branch (Upper Route teaching Rootline traversal)
-    addSolidFloor(950, 380, 240, 36, 'platform_l3_canopy');
-    addCanopyStrut(870, 380, 200);
-    addCanopyStrut(1030, 380, 200);
+    // 3. Graduated Root Shelves & Canopy Branch across the [860, 1060] chasm
+    // Low stepping root shelf: effortless 78px rise from ground (y: 648 -> 570)
+    addSolidFloor(900, 570, 150, 32, 'platform_l3_root');
+    addRootPier(900, 602, 54);
+
+    // Mid stepping root shelf: gentle 70px rise (y: 570 -> 500)
+    addSolidFloor(1010, 500, 150, 32, 'platform_l3_root');
+    addRootPier(1010, 532, 54);
+
+    // High Canopy Branch (Upper Route teaching Rootline traversal, carrying hermes_step relic)
+    addSolidFloor(960, 440, 220, 34, 'platform_l3_canopy');
+    addCanopyStrut(880, 440, 180);
+    addCanopyStrut(1040, 440, 180);
 
     // 4. Threshold Forest Edge (x: 1060 to 1400)
     addSolidFloor(1230, groundTop, 340, groundThickness, 'platform_l3_root');
@@ -85,22 +94,33 @@ export class Level3Architecture {
 
     // =========================================================================
     // STAGE 2 — THE VERDANT WILDS (x: 1400 - 2800)
-    // Multi-tier canopy routes over toxic acid spore chasms
+    // Multi-tier canopy routes over toxic acid spore chasms with recovery decks
     // =========================================================================
     // Lower Wilds Trunk Ground (x: 1400 to 1820)
     addSolidFloor(1610, groundTop, 420, groundThickness, 'platform_l3_root');
     addRootPier(1500, groundTop + 10, 84);
     addRootPier(1720, groundTop + 10, 84);
 
+    // Pre-chasm takeoff root ledge (x: 1780, y: 560)
+    addSolidFloor(1780, 560, 160, 32, 'platform_l3_root');
+    addRootPier(1780, 592, 56);
+
     // Acid Spore Chasm gap is at x: 1820 to 2260
-    // Mid Canopy Aerial Deck (Walkway spanning the chasm)
-    addSolidFloor(2040, 360, 280, 36, 'platform_l3_canopy');
-    addCanopyStrut(1940, 360, 220);
-    addCanopyStrut(2140, 360, 220);
+    // Mid Canopy Aerial Deck (Walkway bridging the chasm)
+    addSolidFloor(1980, 480, 220, 34, 'platform_l3_canopy');
+    addCanopyStrut(1980, 480, 160);
+
+    // Ascending canopy deck
+    addSolidFloor(2160, 420, 200, 34, 'platform_l3_canopy');
+    addCanopyStrut(2160, 420, 220);
+
+    // Safe lower recovery root deck (sits right above acid marsh to catch missed jumps)
+    addSolidFloor(2040, 620, 280, 30, 'platform_l3_root');
+    addRootPier(2040, 650, 70);
 
     // High Observation Canopy (Carrying Aegis of Olympus relic)
-    addSolidFloor(2340, 200, 240, 34, 'platform_l3_canopy');
-    addCanopyStrut(2340, 200, 380);
+    addSolidFloor(2340, 320, 220, 34, 'platform_l3_canopy');
+    addCanopyStrut(2340, 320, 260);
 
     // Lower Wilds Rampart (x: 2260 to 2800)
     addSolidFloor(2530, groundTop, 540, groundThickness, 'platform_l3_root');
@@ -116,7 +136,7 @@ export class Level3Architecture {
     addRootPier(2920, groundTop + 10, 88);
     addRootPier(3120, groundTop + 10, 88);
 
-    // Interior Framing Trunk Rib
+    // Interior Framing Trunk Ribs
     if (scene.textures.exists('platform_l3_colossus_wall')) {
       const ribL = scene.add.image(2840, 380, 'platform_l3_colossus_wall');
       ribL.setDisplaySize(54, 400).setDepth(6).setAlpha(0.9);
@@ -124,13 +144,21 @@ export class Level3Architecture {
       ribR.setDisplaySize(54, 400).setDepth(6).setAlpha(0.9);
     }
 
-    // Mid Colossus Interior Deck
-    addSolidFloor(3500, 380, 280, 36, 'platform_l3_colossus_floor');
-    addRootPier(3500, 416, 48);
+    // Lower Interior Rib Shelf
+    addSolidFloor(3200, 540, 180, 32, 'platform_l3_colossus_floor');
+    addRootPier(3200, 572, 60);
 
-    // High Core Power Balcony
-    addSolidFloor(3820, 220, 260, 34, 'platform_l3_colossus_floor');
-    addRootPier(3820, 254, 48);
+    // Mid Colossus Interior Deck
+    addSolidFloor(3460, 450, 240, 34, 'platform_l3_colossus_floor');
+    addRootPier(3460, 484, 56);
+
+    // High Core Power Balcony (Carrying thunderheart relic)
+    addSolidFloor(3760, 320, 240, 34, 'platform_l3_colossus_floor');
+    addRootPier(3760, 354, 56);
+
+    // Descending Eastern Rib Shelf (stepping down into eastern floor)
+    addSolidFloor(3660, 530, 180, 32, 'platform_l3_colossus_floor');
+    addRootPier(3660, 562, 60);
 
     // Colossus Eastern Floor (x: 3660 to 4200)
     addSolidFloor(3930, groundTop, 540, groundThickness, 'platform_l3_colossus_floor');
@@ -139,7 +167,7 @@ export class Level3Architecture {
 
     // =========================================================================
     // STAGE 4 — THE HEARTROOT SANCTUARY (x: 4200 - 5600)
-    // Sacred ivory biomechanical cathedral with bloomable energy light-bridge
+    // Sacred ivory biomechanical cathedral with accessible altar and bloomable bridge
     // =========================================================================
     // Western Sanctuary Causeway (x: 4200 to 4680)
     addSolidFloor(4440, groundTop, 480, groundThickness, 'platform_l3_sanctuary');
@@ -151,17 +179,28 @@ export class Level3Architecture {
     addRootPier(4800, groundTop + 10, 90);
     addRootPier(5020, groundTop + 10, 90);
 
+    // Altar Platform Supporting HEARTROOT_HARMONIZE Console (x: 4850, y: 500)
+    addSolidFloor(4850, 500, 220, 34, 'platform_l3_sanctuary');
+    addRootPier(4850, 534, 60);
+
+    // Stepping ledges up to the cathedral altar
+    addSolidFloor(4660, 560, 160, 30, 'platform_l3_sanctuary');
+    addSolidFloor(5040, 560, 160, 30, 'platform_l3_sanctuary');
+
     // Upper Cathedral Balconies (Tactical dodging perches during guardian fights)
-    addSolidFloor(4640, 440, 180, 34, 'platform_l3_sanctuary');
-    addSolidFloor(5180, 440, 180, 34, 'platform_l3_sanctuary');
+    addSolidFloor(4640, 420, 180, 32, 'platform_l3_sanctuary');
+    addSolidFloor(5180, 420, 180, 32, 'platform_l3_sanctuary');
 
     // Chasm at x: 5140 to 5480 spanned by blooming Heartroot Energy Bridge!
-    const sanctuaryBridge = addSolidFloor(5310, 540, 320, 34, 'platform_l3_sanctuary');
+    const sanctuaryBridge = addSolidFloor(5310, 550, 340, 34, 'platform_l3_sanctuary');
     sanctuaryBridge.setAlpha(0.25);
     const bridgeBody = sanctuaryBridge.body as Phaser.Physics.Arcade.StaticBody;
     bridgeBody.enable = false;
 
-    scene.events.once('heartroot-harmonized', () => {
+    // Upper Ivory Root Archway across the chasm (Alternative parkour route)
+    addSolidFloor(5310, 440, 200, 32, 'platform_l3_sanctuary');
+
+    const onHeartrootHarmonized = () => {
       bridgeBody.enable = true;
       bridgeBody.updateFromGameObject();
       scene.tweens.add({
@@ -170,6 +209,10 @@ export class Level3Architecture {
         duration: 600,
         ease: 'Sine.easeInOut',
       });
+    };
+    EventBus.on('heartroot-harmonized', onHeartrootHarmonized);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      EventBus.off('heartroot-harmonized', onHeartrootHarmonized);
     });
 
     // Eastern Sanctuary Rampart (x: 5480 to 5600)
@@ -178,16 +221,29 @@ export class Level3Architecture {
 
     // =========================================================================
     // STAGE 5 — THE BIOSPHERE CRUCIBLE (x: 5600 - 7000)
-    // Seed pod approach with braided gold & emerald lines & phased bridges
+    // Braided root conduits with motorized seed pod ferry across chasm
     // =========================================================================
     // Crucible Western Deck (x: 5600 to 6040)
     addSolidFloor(5820, groundTop, 440, groundThickness, 'platform_l3_crucible');
     addRootPier(5720, groundTop + 10, 88);
     addRootPier(5940, groundTop + 10, 88);
 
-    // High Crucible Conduit Walkways
-    addSolidFloor(5960, 400, 220, 34, 'platform_l3_canopy');
-    addCanopyStrut(5960, 400, 180);
+    // Stepping root arches across the [6040, 6460] chasm
+    // 1. Takeoff Root Arch
+    addSolidFloor(6080, 530, 160, 32, 'platform_l3_crucible');
+    addRootPier(6080, 562, 60);
+
+    // 2. High Canopy Conduit Walkway
+    addSolidFloor(5960, 420, 220, 34, 'platform_l3_canopy');
+    addCanopyStrut(5960, 420, 180);
+
+    // 3. Intermediate Root Anchor
+    addSolidFloor(6250, 440, 180, 32, 'platform_l3_crucible');
+    addRootPier(6250, 472, 60);
+
+    // 4. Landing Root Arch
+    addSolidFloor(6420, 530, 160, 32, 'platform_l3_crucible');
+    addRootPier(6420, 562, 60);
 
     // Central Crucible Dais (x: 6460 to 7000)
     addSolidFloor(6730, groundTop, 540, groundThickness, 'platform_l3_crucible');
@@ -195,14 +251,14 @@ export class Level3Architecture {
     addRootPier(6860, groundTop + 10, 88);
 
     // High Crucible Balcony (carrying overdrive shard & rune_of_ruin)
-    addSolidFloor(6640, 320, 240, 34, 'platform_l3_crucible');
+    addSolidFloor(6640, 360, 240, 34, 'platform_l3_crucible');
 
     // =========================================================================
     // STAGE 6 — THE WORLDSEED GUARDIAN (x: 7000 - 8400)
     // Purpose-built boss combat arena matching level-3-stage6.png!
     // =========================================================================
-    // Solid, expansive combat arena floor spanning x: 7060 to 8380
-    addSolidFloor(7720, groundTop, 1320, groundThickness, 'platform_l3_arena');
+    // Solid, expansive combat arena floor spanning x: 7040 to 8380
+    addSolidFloor(7710, groundTop, 1340, groundThickness, 'platform_l3_arena');
 
     // Heavy foundation root piers underneath arena
     [7200, 7450, 7720, 7990, 8240].forEach((px) => {
@@ -210,19 +266,19 @@ export class Level3Architecture {
     });
 
     // Left Arched Bone Ledge (matching ivory archway on the left of level-3-stage6.png)
-    addSolidFloor(7340, 440, 220, 34, 'platform_l3_arena');
-    addCanopyStrut(7340, 440, 140);
+    addSolidFloor(7340, 460, 220, 34, 'platform_l3_arena');
+    addCanopyStrut(7340, 460, 140);
 
     // Right Arched Bone Ledge (matching ivory archway on the right of level-3-stage6.png)
-    addSolidFloor(8100, 440, 220, 34, 'platform_l3_arena');
-    addCanopyStrut(8100, 440, 140);
+    addSolidFloor(8080, 460, 220, 34, 'platform_l3_arena');
+    addCanopyStrut(8080, 460, 140);
 
     // Worldseed Guardian Arena Arched Bone Walls (Framing boundaries at 7040 and 8400)
     if (scene.textures.exists('platform_l3_arena_wall')) {
-      const wallL = scene.add.image(7040, 380, 'platform_l3_arena_wall');
-      wallL.setDisplaySize(54, 400).setDepth(20).setAlpha(0.95);
-      const wallR = scene.add.image(8400, 380, 'platform_l3_arena_wall');
-      wallR.setDisplaySize(54, 400).setDepth(20).setAlpha(0.95);
+      const wallL = scene.add.image(7040, 470, 'platform_l3_arena_wall');
+      wallL.setDisplaySize(48, 220).setDepth(20).setAlpha(0.95);
+      const wallR = scene.add.image(8400, 470, 'platform_l3_arena_wall');
+      wallR.setDisplaySize(48, 220).setDepth(20).setAlpha(0.95);
     }
   }
 
@@ -249,14 +305,14 @@ export class Level3Architecture {
       label: 'CANOPY SWING TENDRIL',
       prompt: '[F] ROOTLINE // SWING ACROSS CHASM',
       radius: 280,
-      targetX: 2020,
-      targetY: 340,
+      targetX: 1980,
+      targetY: 460,
     });
 
     rootlineManager.addAnchor({
       id: 's2_spore_launch',
       x: 2160,
-      y: 330,
+      y: 400,
       kind: 'launch',
       label: 'KINETIC SPORE BULB',
       prompt: '[F] SPORE LAUNCH // UPPER DECK',
@@ -275,15 +331,15 @@ export class Level3Architecture {
       label: 'CORE ROOTLINE ANCHOR',
       prompt: '[F] ROOTLINE // GRAPPLE TO CORE BALCONY',
       radius: 300,
-      targetX: 3820,
-      targetY: 200,
+      targetX: 3760,
+      targetY: 300,
     });
 
     // Stage 4: Heartroot Conduit Blossom
     rootlineManager.addAnchor({
       id: 's4_heartroot_bloom',
       x: 4850,
-      y: 400,
+      y: 460,
       kind: 'env',
       label: 'HEARTROOT CONDUIT BLOSSOM',
       prompt: '[E / F] HARMONIZE HEARTROOT CONDUIT',
@@ -294,8 +350,8 @@ export class Level3Architecture {
     // Stage 5: Crucible Spore Launch & Containment Matrix
     rootlineManager.addAnchor({
       id: 's5_crucible_launch',
-      x: 6460,
-      y: 460,
+      x: 6420,
+      y: 510,
       kind: 'launch',
       label: 'CRUCIBLE SPORE CATAPULT',
       prompt: '[F] SPORE LAUNCH // UPPER CRUCIBLE DECK',
@@ -308,7 +364,7 @@ export class Level3Architecture {
     rootlineManager.addAnchor({
       id: 's5_crucible_env',
       x: 6720,
-      y: 380,
+      y: 600,
       kind: 'env',
       label: 'WORLDS EED CONTAINMENT MATRIX',
       prompt: '[E / F] OVERCHARGE SEED CONTAINMENT',

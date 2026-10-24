@@ -134,9 +134,29 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.play('raone-idle');
     this.applyGlow();
 
+    // Level 4: The Void Sovereign unique dark cosmic palette & aura
+    if (this.level === 4) {
+      this.setTint(0xc084fc);
+      if (this.aura) this.aura.setTint(0x9333ea);
+      if (this.plume) this.plume.setTint(0xa855f7);
+      if (this.ring) this.ring.setTint(0xa855f7);
+    }
+
     // Dramatic entrance before the AI takes over.
     this.nextActionAt = d.scene.time.now + 1500;
     this.bossState = 'idle';
+  }
+
+  private get bossEnergyColor(): number {
+    return this.level === 4 ? 0xc084fc : VILLAIN.energy;
+  }
+
+  private get boltTexture(): string {
+    return this.level === 4 ? 'proj_void_plasma' : 'proj_raone_bolt';
+  }
+
+  private get orbTexture(): string {
+    return this.level === 4 ? 'proj_void_plasma' : 'proj_raone_orb';
   }
 
   private applyGlow() {
@@ -346,15 +366,20 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
         onUpdate: (tw) => {
           if (!this.active) return;
           const v = tw.getValue() ?? 0;
-          if (Math.sin(v * Math.PI * 10) > 0) this.setTint(VILLAIN.energy).setTintMode(Phaser.TintModes.FILL);
+          if (Math.sin(v * Math.PI * 10) > 0) this.setTint(this.bossEnergyColor).setTintMode(Phaser.TintModes.FILL);
+          else if (this.level === 4) this.setTint(0xc084fc);
           else this.clearTint();
         },
-        onComplete: () => this.clearTint(),
+        onComplete: () => {
+          if (this.level === 4) this.setTint(0xc084fc);
+          else this.clearTint();
+        },
       })
     );
 
     this.later(duration, () => {
-      this.clearTint();
+      if (this.level === 4) this.setTint(0xc084fc);
+      else this.clearTint();
       this.enter('attack', 300);
       this.play('raone-strike', true);
       then();
@@ -402,7 +427,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.faceTarget();
     this.telegraph(PJ.singleShot.telegraph * this.phaseInfo.speedScale, () => {
       AudioManager.getInstance().playRaOneShoot();
-      this.shoot(this.aimAtTarget(), PJ.singleShot.speed, 'proj_raone_bolt', 'proj-bolt');
+      this.shoot(this.aimAtTarget(), PJ.singleShot.speed, this.boltTexture, 'proj-bolt');
       this.finishAction(520);
     });
   }
@@ -415,7 +440,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
       const count = PJ.spreadShot.count + (this.phase >= 3 ? 2 : 0);
       for (let i = 0; i < count; i++) {
         const t = count === 1 ? 0 : i / (count - 1) - 0.5;
-        this.shoot(base + t * PJ.spreadShot.spread * 2, PJ.spreadShot.speed, 'proj_raone_bolt', 'proj-bolt');
+        this.shoot(base + t * PJ.spreadShot.spread * 2, PJ.spreadShot.speed, this.boltTexture, 'proj-bolt');
       }
       this.finishAction(640);
     });
@@ -426,7 +451,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.telegraph(PJ.chargedOrb.telegraph * this.phaseInfo.speedScale, () => {
       AudioManager.getInstance().playExplosion();
       this.juice.shake(0.01, 240);
-      this.shoot(this.aimAtTarget(), PJ.chargedOrb.speed, 'proj_raone_orb', 'proj-orb', {
+      this.shoot(this.aimAtTarget(), PJ.chargedOrb.speed, this.orbTexture, 'proj-orb', {
         scale: 0.7,
         bodyWidth: 54,
         bodyHeight: 54,
@@ -533,7 +558,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
             if (this.bossState === 'defeated') return;
             shots++;
             AudioManager.getInstance().playRaOneShoot();
-            this.shoot(this.aimAtTarget(0), PJ.spreadShot.speed * 1.1, 'proj_raone_bolt', 'proj-bolt');
+            this.shoot(this.aimAtTarget(0), PJ.spreadShot.speed * 1.1, this.boltTexture, 'proj-bolt');
           },
         });
 
@@ -593,7 +618,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
       callback: () => {
         guide.clear();
         if (!this.active) return;
-        guide.lineStyle(2, VILLAIN.energy, 0.75);
+        guide.lineStyle(2, this.bossEnergyColor, 0.75);
         guide.lineBetween(originX, originY, originX + dir * reach, lockY);
       },
     });
@@ -610,7 +635,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
 
       AudioManager.getInstance().playExplosion();
       this.juice.shake(0.026, 420);
-      this.juice.flash(VILLAIN.energy, 0.25, 180);
+      this.juice.flash(this.bossEnergyColor, 0.25, 180);
 
       const angle = Math.atan2(lockY - originY, dir * reach);
       const beam = spawnProjectile(this.pool, {
@@ -628,6 +653,9 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
         stretchTo: reach,
         bodyHeight: 26,
       });
+      if (beam && this.level === 4) {
+        beam.setTint(0xc084fc);
+      }
       if (beam) {
         this.scene.tweens.add({
           targets: beam,

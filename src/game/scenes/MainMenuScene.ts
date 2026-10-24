@@ -106,7 +106,7 @@ export class MainMenuScene extends Phaser.Scene {
       const level = payload?.level ?? 1;
       this.scene.start('ArenaScene', { level, fromCheckpoint: false });
     };
-    EventBus.once(GAME_EVENTS.START_GAME, onStart);
+    EventBus.on(GAME_EVENTS.START_GAME, onStart);
 
     // If autoplay was requested via URL, trigger once Preload & MainMenu are ready
     if (typeof window !== 'undefined') {

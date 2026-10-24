@@ -300,15 +300,124 @@ function guardianOrganismTexture(scene: Phaser.Scene, hit: boolean) {
   });
 }
 
-/** Spore Mortar Projectile — glowing emerald spore bomb fired by Sporecaster. */
+/** Level 4: Void Drone — hovering alien drone with anti-grav thrusters and purple ocular lens. */
+const VOID_DRONE_W = 58;
+const VOID_DRONE_H = 62;
+function voidDroneTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_void_drone_hit' : 'enemy_void_drone';
+  const body = hit ? 0xffffff : 0x160824;
+  const rim = hit ? 0xffffff : 0xa855f7;
+  const core = hit ? 0xffffff : 0xc084fc;
+
+  forge(scene, key, VOID_DRONE_W, VOID_DRONE_H, (g) => {
+    const cx = VOID_DRONE_W / 2;
+    // Diamond floating hull with swept-back stabilizer blades
+    const hull = [
+      { x: cx, y: 8 },
+      { x: cx + 18, y: 24 },
+      { x: cx + 12, y: 46 },
+      { x: cx, y: 56 },
+      { x: cx - 12, y: 46 },
+      { x: cx - 18, y: 24 },
+    ];
+    poly(g, hull, body, 1);
+    outline(g, hull, rim, 0.9, 1.8);
+
+    // Lateral anti-grav thruster pods
+    poly(g, [{ x: cx - 18, y: 22 }, { x: cx - 28, y: 28 }, { x: cx - 18, y: 36 }], 0x2e104d, 1);
+    poly(g, [{ x: cx + 18, y: 22 }, { x: cx + 28, y: 28 }, { x: cx + 18, y: 36 }], 0x2e104d, 1);
+
+    // Ocular void sensor
+    energyCore(g, cx, 28, 8, core, 0xffffff, 0x3b0764, 1);
+  });
+}
+
+/** Level 4: Rift Stalker — low quadrupedal dimensional hunter with crystal spines. */
+const RIFT_STALKER_W = 76;
+const RIFT_STALKER_H = 54;
+function riftStalkerTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_rift_stalker_hit' : 'enemy_rift_stalker';
+  const body = hit ? 0xffffff : 0x1a092a;
+  const rim = hit ? 0xffffff : 0x9333ea;
+  const crystal = hit ? 0xffffff : 0xd8b4fe;
+
+  forge(scene, key, RIFT_STALKER_W, RIFT_STALKER_H, (g) => {
+    const cx = RIFT_STALKER_W / 2;
+    // Low, muscular prowler hull
+    const torso = [
+      { x: cx - 28, y: 34 },
+      { x: cx - 24, y: 18 },
+      { x: cx + 8, y: 14 },
+      { x: cx + 32, y: 26 },
+      { x: cx + 22, y: 38 },
+      { x: cx - 12, y: 42 },
+    ];
+    poly(g, torso, body, 1);
+    outline(g, torso, rim, 0.85, 1.6);
+
+    // Amethyst dorsal crystal spines
+    poly(g, [{ x: cx - 14, y: 18 }, { x: cx - 10, y: 4 }, { x: cx - 4, y: 16 }], crystal, 0.95);
+    poly(g, [{ x: cx + 2, y: 15 }, { x: cx + 8, y: 2 }, { x: cx + 14, y: 16 }], crystal, 0.95);
+
+    // Fanged maw and eyes
+    g.fillStyle(0xc084fc, 0.9);
+    g.fillCircle(cx + 26, 24, 2.5);
+  });
+}
+
+/** Level 4: Gravity Sentinel — towering armored construct with heavy gravitational plating. */
+const GRAVITY_SENTINEL_W = 80;
+const GRAVITY_SENTINEL_H = 92;
+function gravitySentinelTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_gravity_sentinel_hit' : 'enemy_gravity_sentinel';
+  const body = hit ? 0xffffff : 0x11041f;
+  const rim = hit ? 0xffffff : 0x7e22ce;
+  const shield = hit ? 0xffffff : 0xa855f7;
+
+  forge(scene, key, GRAVITY_SENTINEL_W, GRAVITY_SENTINEL_H, (g) => {
+    const cx = GRAVITY_SENTINEL_W / 2;
+    // Broad, heavy angular chassis
+    const torso = [
+      { x: cx - 26, y: 18 },
+      { x: cx + 26, y: 18 },
+      { x: cx + 34, y: 48 },
+      { x: cx + 20, y: 82 },
+      { x: cx - 20, y: 82 },
+      { x: cx - 34, y: 48 },
+    ];
+    poly(g, torso, body, 1);
+    outline(g, torso, rim, 0.9, 2);
+
+    // Massive frontal gravitational crest plate
+    poly(g, [{ x: cx - 18, y: 24 }, { x: cx + 18, y: 24 }, { x: cx + 14, y: 56 }, { x: cx - 14, y: 56 }], 0x240938, 1);
+    outline(g, [{ x: cx - 18, y: 24 }, { x: cx + 18, y: 24 }, { x: cx + 14, y: 56 }, { x: cx - 14, y: 56 }], shield, 0.95, 1.6);
+
+    // Gravitational core
+    energyCore(g, cx, 40, 10, shield, 0xffffff, 0x160324, 1);
+  });
+}
+
+/** Spore Mortar Projectile — toxic emerald pod launched by Sporecasters in Realm 3. */
 function sporeMortarTexture(scene: Phaser.Scene) {
-  forge(scene, 'proj_spore_mortar', 24, 24, (g) => {
-    g.fillStyle(0x10b981, 0.95);
-    g.fillCircle(12, 12, 10);
-    g.fillStyle(0x84cc16, 0.9);
-    g.fillCircle(12, 12, 6);
+  forge(scene, 'proj_spore_mortar', 20, 20, (g) => {
+    g.fillStyle(0x059669, 0.95);
+    g.fillCircle(10, 10, 9);
+    g.fillStyle(0x34d399, 0.9);
+    g.fillCircle(10, 10, 6);
+    g.fillStyle(0xa7f3d0, 1);
+    g.fillCircle(10, 10, 2.5);
+  });
+}
+
+/** Void Plasma Projectile — tracking dark-violet energy orb fired by Void Drones & Void Sovereign. */
+function voidPlasmaTexture(scene: Phaser.Scene) {
+  forge(scene, 'proj_void_plasma', 24, 24, (g) => {
+    g.fillStyle(0x7e22ce, 0.95);
+    g.fillCircle(12, 12, 11);
+    g.fillStyle(0xc084fc, 0.9);
+    g.fillCircle(12, 12, 7);
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(12, 12, 2.5);
+    g.fillCircle(12, 12, 3);
   });
 }
 
@@ -326,6 +435,15 @@ export function buildEnemies(scene: Phaser.Scene) {
   guardianOrganismTexture(scene, false);
   guardianOrganismTexture(scene, true);
   sporeMortarTexture(scene);
+
+  // Level 4 enemies
+  voidDroneTexture(scene, false);
+  voidDroneTexture(scene, true);
+  riftStalkerTexture(scene, false);
+  riftStalkerTexture(scene, true);
+  gravitySentinelTexture(scene, false);
+  gravitySentinelTexture(scene, true);
+  voidPlasmaTexture(scene);
 }
 
 export const ENEMY_FRAME = {
@@ -335,5 +453,8 @@ export const ENEMY_FRAME = {
   sporecaster: { w: SPORECASTER_W, h: SPORECASTER_H },
   canopy_hunter: { w: CANOPY_HUNTER_W, h: CANOPY_HUNTER_H },
   guardian_organism: { w: GUARDIAN_ORGANISM_W, h: GUARDIAN_ORGANISM_H },
+  void_drone: { w: VOID_DRONE_W, h: VOID_DRONE_H },
+  rift_stalker: { w: RIFT_STALKER_W, h: RIFT_STALKER_H },
+  gravity_sentinel: { w: GRAVITY_SENTINEL_W, h: GRAVITY_SENTINEL_H },
 } as const;
 

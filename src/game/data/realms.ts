@@ -130,31 +130,39 @@ export const REALMS: Record<number, RealmEnvironment> = {
   },
 
   /* ---------------------------------------------------------------------
-     IV — FROZEN OBSERVATORY
-     Order preserved under ice — but the ice is not solid ground.
+     IV — THE VOIDBORN ABYSS
+     Six-Stage Campaign · Gravity Manipulation · Dimensional Combat
      --------------------------------------------------------------------- */
   4: {
     id: 4,
     backdrop: 'bg_realm4',
-    skyTop: 0x030d1f,
-    skyMid: 0x0e2f52,
-    skyLow: 0x5b9fc9,
-    haze: 0xbfe9ff,
-    hazeStrength: 0.26,
+    stageBackdrops: [
+      { fromX: 0, key: 'bg_realm4_stage1', label: 'Stage I — The Breach Beyond' },
+      { fromX: 1400, key: 'bg_realm4_stage2', label: 'Stage II — The Gravity Graveyard' },
+      { fromX: 2800, key: 'bg_realm4_stage3', label: 'Stage III — The Riftborn Hunt' },
+      { fromX: 4200, key: 'bg_realm4_stage4', label: 'Stage IV — The Crystal Cataclysm' },
+      { fromX: 5600, key: 'bg_realm4_stage5', label: 'Stage V — The Devouring Singularity' },
+      { fromX: 7000, key: 'bg_realm4_stage6', label: 'Stage VI — The Void Sovereign' },
+    ],
+    skyTop: 0x0a0314,
+    skyMid: 0x1f0b38,
+    skyLow: 0x4a187a,
+    haze: 0xc084fc,
+    hazeStrength: 0.32,
     skylineStyle: 'crystals',
-    silhouetteFar: 0x0f2f4a,
-    silhouetteNear: 0x061727,
-    rimFar: 0x7fd4ff,
-    rimNear: ICE,
-    platformTop: 0xd6f0ff,
-    platformBody: 0x3f6d8f,
-    platformDeep: 0x0c1f30,
-    platformEnergy: 0x7fd4ff,
-    ambient: 'snow',
-    ambientTint: ICE,
+    silhouetteFar: 0x160728,
+    silhouetteNear: 0x090212,
+    rimFar: 0xa855f7,
+    rimNear: 0xd8b4fe,
+    platformTop: 0xf3e8ff,
+    platformBody: 0x581c87,
+    platformDeep: 0x140424,
+    platformEnergy: 0xa855f7,
+    ambient: 'embers',
+    ambientTint: 0xc084fc,
     storm: false,
-    stormTint: ORDER_DEEP,
-    corruption: 0.5,
+    stormTint: 0x7e22ce,
+    corruption: 0.75,
   },
 
   /* ---------------------------------------------------------------------
