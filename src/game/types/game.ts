@@ -183,7 +183,19 @@ export type EnemyKind =
   /** Level 4: Aggressive ground predator with dimensional leap. */
   | 'rift_stalker'
   /** Level 4: Heavy armored construct with gravitational shielding. */
-  | 'gravity_sentinel';
+  | 'gravity_sentinel'
+  /** Level 5: Aerial security drone firing electric amber bolts. */
+  | 'security_drone'
+  /** Level 5: Ground cyber-enforcer with hydraulic dash strikes. */
+  | 'protocol_enforcer'
+  /** Level 5: Towering security construct with amber barrier shield. */
+  | 'firewall_sentinel'
+  /** Level 6: Aggressive pursuit predator in The Black Crown. */
+  | 'crown_stalker'
+  /** Level 6: Ranged pressure marksman with dark energy blasts. */
+  | 'dominion_marksman'
+  /** Level 6: Heavy armored construct with interruptible power strike. */
+  | 'crown_sentinel';
 
 export interface EnemySpec {
   kind: EnemyKind;

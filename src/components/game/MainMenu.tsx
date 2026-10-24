@@ -87,7 +87,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
     audio.init();
     audio.resume();
 
-    if (showCinematic && getRealmReveal(level)) {
+    const shouldShowReveal = (showCinematic || !SaveManager.hasSeenReveal(level)) && Boolean(getRealmReveal(level));
+
+    if (shouldShowReveal) {
+      SaveManager.markRevealSeen(level);
       setRevealLevel(level);
       return;
     }
@@ -119,6 +122,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
 
   const handleRevealFinish = useCallback(() => {
     const level = revealLevel ?? 1;
+    SaveManager.markRevealSeen(level);
     setRevealLevel(null);
     proceedToGame(level, true);
   }, [revealLevel, proceedToGame]);

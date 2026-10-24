@@ -104,6 +104,22 @@ export class SaveManager {
     }
   }
 
+  public static hasSeenReveal(level: number): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem(`gone_seen_reveal_${level}`) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  public static markRevealSeen(level: number) {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(`gone_seen_reveal_${level}`, 'true');
+    } catch {}
+  }
+
   public static resetProgress() {
     if (typeof window === 'undefined') return;
     try {
@@ -111,6 +127,9 @@ export class SaveManager {
       localStorage.removeItem(LAST_LEVEL_KEY);
       for (const k of PROGRESS_KEYS) {
         localStorage.removeItem(k);
+      }
+      for (let lvl = 1; lvl <= 6; lvl++) {
+        localStorage.removeItem(`gone_seen_reveal_${lvl}`);
       }
     } catch {}
   }

@@ -123,6 +123,60 @@ const KIND_CONFIG: Record<EnemyKind, KindConfig> = {
     contactDamage: 2,
     attackCooldownMs: 2200,
   },
+  security_drone: {
+    frame: ENEMY_FRAME.security_drone,
+    health: 3,
+    speed: 130,
+    detectRange: 520,
+    engageRange: 320,
+    contactDamage: 1,
+    attackCooldownMs: 1600,
+  },
+  protocol_enforcer: {
+    frame: ENEMY_FRAME.protocol_enforcer,
+    health: 4,
+    speed: 200,
+    detectRange: 460,
+    engageRange: 90,
+    contactDamage: 1,
+    attackCooldownMs: 1400,
+  },
+  firewall_sentinel: {
+    frame: ENEMY_FRAME.firewall_sentinel,
+    health: 7,
+    speed: 75,
+    detectRange: 420,
+    engageRange: 110,
+    contactDamage: 2,
+    attackCooldownMs: 2200,
+  },
+  crown_stalker: {
+    frame: ENEMY_FRAME.crown_stalker,
+    health: 4,
+    speed: 220,
+    detectRange: 480,
+    engageRange: 85,
+    contactDamage: 1,
+    attackCooldownMs: 1300,
+  },
+  dominion_marksman: {
+    frame: ENEMY_FRAME.dominion_marksman,
+    health: 3,
+    speed: 110,
+    detectRange: 540,
+    engageRange: 340,
+    contactDamage: 1,
+    attackCooldownMs: 1700,
+  },
+  crown_sentinel: {
+    frame: ENEMY_FRAME.crown_sentinel,
+    health: 7,
+    speed: 70,
+    detectRange: 420,
+    engageRange: 110,
+    contactDamage: 2,
+    attackCooldownMs: 2200,
+  },
 };
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
@@ -218,6 +272,28 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return true;
   }
 
+  /** Protocol Break hook: returns true if this enemy is currently in an interruptible telegraph window. */
+  public isInterruptible(): boolean {
+    return this.active && this.state === 'telegraph' && (this.kind === 'crown_sentinel' || this.kind === 'firewall_sentinel' || this.kind === 'gravity_sentinel');
+  }
+
+  /** Force interrupt and stun from Protocol Break. */
+  public interrupt(durationMs = 2800) {
+    if (this.state === 'dead' || !this.active) return;
+    this.transitionTo('stagger', durationMs);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (body) body.setVelocity(0, 0);
+    this.takeDamage(2);
+    this.setTint(0x00f0ff);
+    this.scene.time.delayedCall(450, () => {
+      if (this.active) this.clearTint();
+    });
+    this.juice.impact(this.x, this.y, 'player', { scale: 1.8, sparks: 25, ring: true });
+    this.juice.floatText(this.x, this.y - 40, 'PROTOCOL BREAK', 0x00f0ff, 18);
+    this.juice.shake(0.015, 300);
+    AudioManager.getInstance().playExplosion();
+  }
+
   private die() {
     this.transitionTo('dead');
     const body = this.body as Phaser.Physics.Arcade.Body;
@@ -311,7 +387,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           this.kind === 'rootstalker' ||
           this.kind === 'guardian_organism' ||
           this.kind === 'rift_stalker' ||
-          this.kind === 'gravity_sentinel'
+          this.kind === 'gravity_sentinel' ||
+          this.kind === 'protocol_enforcer' ||
+          this.kind === 'firewall_sentinel' ||
+          this.kind === 'crown_stalker' ||
+          this.kind === 'crown_sentinel'
         ) {
           if (distToTarget > this.cfg.engageRange) {
             body.setVelocityX(this.facing * this.cfg.speed);
@@ -334,7 +414,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
             if (time >= this.nextAttackAt) this.beginTelegraph();
           }
         } else {
-          // seeker & void_drone: maintain standoff distance, strafe rather than close in.
+          // seeker, void_drone, dominion_marksman: maintain standoff distance, strafe rather than close in.
           if (distToTarget < this.cfg.engageRange - 40) {
             body.setVelocityX(-this.facing * this.cfg.speed * 0.6);
           } else if (distToTarget > this.cfg.engageRange + 60) {
@@ -384,7 +464,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.transitionTo('telegraph', TELEGRAPH_MS);
     const isEmerald = this.kind === 'rootstalker' || this.kind === 'sporecaster';
     const isVoid = this.kind === 'void_drone' || this.kind === 'rift_stalker' || this.kind === 'gravity_sentinel';
-    const tint = isEmerald ? 0x10b981 : isVoid ? 0xa855f7 : VILLAIN.rim;
+    const isAmber = this.kind === 'security_drone' || this.kind === 'protocol_enforcer' || this.kind === 'firewall_sentinel';
+    const isCrown = this.kind === 'crown_stalker' || this.kind === 'dominion_marksman' || this.kind === 'crown_sentinel';
+    const tint = isCrown ? 0x641329 : isAmber ? 0xf59e0b : isEmerald ? 0x10b981 : isVoid ? 0xa855f7 : VILLAIN.rim;
     this.setTint(tint);
     this.scene.time.delayedCall(TELEGRAPH_MS, () => {
       if (this.active) this.clearTint();
@@ -405,18 +487,50 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       body.setVelocityX(this.facing * this.cfg.speed * 2.8);
       body.setVelocityY(-200);
       AudioManager.getInstance().playDash();
+    } else if (this.kind === 'protocol_enforcer') {
+      body.setVelocityX(this.facing * this.cfg.speed * 2.8);
+      body.setVelocityY(-160);
+      AudioManager.getInstance().playDash();
+    } else if (this.kind === 'crown_stalker') {
+      body.setVelocityX(this.facing * this.cfg.speed * 2.8);
+      body.setVelocityY(-180);
+      AudioManager.getInstance().playDash();
     } else if (this.kind === 'void_drone') {
       this.fireVoidPlasma();
+    } else if (this.kind === 'security_drone') {
+      this.fireSecurityBolt();
+    } else if (this.kind === 'dominion_marksman') {
+      this.fireCrownBolt();
     } else if (this.kind === 'sporecaster') {
       this.fireSporeMortar();
     } else if (this.kind === 'canopy_hunter') {
       body.setVelocity(this.facing * 340, 240);
       AudioManager.getInstance().playDash();
-    } else if (this.kind === 'guardian_organism' || this.kind === 'gravity_sentinel') {
+    } else if (this.kind === 'crown_sentinel') {
+      this.slamCrownShockwave();
+    } else if (this.kind === 'guardian_organism' || this.kind === 'gravity_sentinel' || this.kind === 'firewall_sentinel') {
       this.slamShockwave();
     } else {
       this.fireAtTarget();
     }
+  }
+
+  private fireSecurityBolt() {
+    if (!this.target || !this.projectiles) return;
+    const dx = this.target.x - this.x;
+    const dy = this.target.y - this.y;
+    const angle = Math.atan2(dy, dx);
+    spawnProjectile(this.projectiles, {
+      x: this.x + Math.cos(angle) * 20,
+      y: this.y + Math.sin(angle) * 20,
+      speed: 400,
+      angle,
+      texture: 'proj_security_bolt',
+      damage: this.cfg.contactDamage,
+      owner: 'boss',
+      lifespan: 2500,
+    });
+    AudioManager.getInstance().playRaOneShoot();
   }
 
   private fireVoidPlasma() {
@@ -482,6 +596,45 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       });
     });
   }
+
+  private fireCrownBolt() {
+    if (!this.target || !this.projectiles) return;
+    const dx = this.target.x - this.x;
+    const dy = this.target.y - this.y;
+    const angle = Math.atan2(dy, dx);
+    spawnProjectile(this.projectiles, {
+      x: this.x + Math.cos(angle) * 20,
+      y: this.y + Math.sin(angle) * 20,
+      speed: 420,
+      angle,
+      texture: 'proj_crown_bolt',
+      damage: this.cfg.contactDamage,
+      owner: 'boss',
+      lifespan: 2600,
+    });
+    AudioManager.getInstance().playRaOneShoot();
+  }
+
+  private slamCrownShockwave() {
+    this.juice.shake(0.016, 340);
+    this.juice.impact(this.x, this.y + 24, 'boss', { scale: 1.8, sparks: 22 });
+    AudioManager.getInstance().playExplosion();
+
+    if (!this.projectiles) return;
+    [-1, 1].forEach((dir) => {
+      spawnProjectile(this.projectiles!, {
+        x: this.x + dir * 28,
+        y: this.y + 20,
+        texture: 'proj_crown_bolt',
+        speed: 380,
+        angle: dir > 0 ? 0 : Math.PI,
+        damage: this.cfg.contactDamage,
+        owner: 'boss',
+        lifespan: 1600,
+        scale: 1.4,
+      });
+    });
+  }
 }
 
 /**
@@ -511,6 +664,11 @@ export class EnemyManager {
 
   public setTarget(player: GOne) {
     this.enemies.forEach((e) => e.setTarget(player));
+  }
+
+  /** Returns all active enemies currently alive. */
+  public getEnemies(): Enemy[] {
+    return this.enemies.filter((e) => e.active);
   }
 
   /** True while any living, active enemy still carries this guard group. */

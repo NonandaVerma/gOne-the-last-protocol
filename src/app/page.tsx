@@ -13,7 +13,8 @@ import { VictoryScreen } from '../components/game/VictoryScreen';
 import { TouchControls } from '../components/game/TouchControls';
 import { StageBanner } from '../components/game/StageBanner';
 import { IntroCinematic } from '../components/game/IntroCinematic';
-import { LevelRevealCinematic } from '../components/game/LevelRevealCinematic';
+import { LevelRevealCinematic, getRealmReveal } from '../components/game/LevelRevealCinematic';
+import { SaveManager } from '../game/systems/SaveManager';
 
 /** Session-scoped: the cinematic replays on a fresh browser session only. */
 const INTRO_KEY = 'gone_intro_played_v1';
@@ -46,6 +47,17 @@ export default function Home() {
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
+      const revealParam = parseInt(params.get('reveal') ?? '', 10);
+      if (revealParam && getRealmReveal(revealParam)) {
+        setShowIntro(false);
+        setRevealLevel(revealParam);
+        return;
+      }
+      if (params.get('state') === 'defeat' || params.get('defeat') === 'true') {
+        setShowIntro(false);
+        setGameState('DEFEAT');
+        return;
+      }
       if (params.get('autoplay') === 'true' || params.get('skipIntro') === 'true') {
         setShowIntro(false);
         return;
@@ -80,6 +92,7 @@ export default function Home() {
     const nextLvl = revealLevel;
     setRevealLevel(null);
     if (nextLvl) {
+      SaveManager.markRevealSeen(nextLvl);
       EventBus.emit('realm-reveal-finished', { level: nextLvl });
     }
   };

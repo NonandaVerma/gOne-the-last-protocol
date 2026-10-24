@@ -421,6 +421,253 @@ function voidPlasmaTexture(scene: Phaser.Scene) {
   });
 }
 
+/** Level 5: Security Drone — hovering graphite drone with electric amber optic lens. */
+const SECURITY_DRONE_W = 56;
+const SECURITY_DRONE_H = 58;
+function securityDroneTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_security_drone_hit' : 'enemy_security_drone';
+  const body = hit ? 0xffffff : 0x181a20;
+  const rim = hit ? 0xffffff : 0xd1d5db;
+  const core = hit ? 0xffffff : 0xf59e0b;
+
+  forge(scene, key, SECURITY_DRONE_W, SECURITY_DRONE_H, (g) => {
+    const cx = SECURITY_DRONE_W / 2;
+    // Swept angular graphite chassis
+    const hull = [
+      { x: cx, y: 6 },
+      { x: cx + 22, y: 22 },
+      { x: cx + 16, y: 46 },
+      { x: cx, y: 52 },
+      { x: cx - 16, y: 46 },
+      { x: cx - 22, y: 22 },
+    ];
+    poly(g, hull, body, 1);
+    outline(g, hull, rim, 0.9, 1.8);
+
+    // Pale ivory wing struts
+    poly(g, [{ x: cx - 14, y: 18 }, { x: cx - 26, y: 24 }, { x: cx - 14, y: 32 }], 0xf3f4f6, 1);
+    poly(g, [{ x: cx + 14, y: 18 }, { x: cx + 26, y: 24 }, { x: cx + 14, y: 32 }], 0xf3f4f6, 1);
+
+    // Ocular amber sensor
+    energyCore(g, cx, 26, 7, core, 0xffffff, 0x451a03, 1);
+  });
+}
+
+/** Level 5: Protocol Enforcer — bipedal cyber-enforcer with black-chrome plating and amber plasma blade. */
+const PROTOCOL_ENFORCER_W = 68;
+const PROTOCOL_ENFORCER_H = 74;
+function protocolEnforcerTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_protocol_enforcer_hit' : 'enemy_protocol_enforcer';
+  const body = hit ? 0xffffff : 0x111317;
+  const rim = hit ? 0xffffff : 0x4b5563;
+  const amber = hit ? 0xffffff : 0xf59e0b;
+
+  forge(scene, key, PROTOCOL_ENFORCER_W, PROTOCOL_ENFORCER_H, (g) => {
+    const cx = PROTOCOL_ENFORCER_W / 2;
+    // Heavy angular cyber-chassis
+    const torso = [
+      { x: cx - 20, y: 16 },
+      { x: cx + 20, y: 16 },
+      { x: cx + 24, y: 48 },
+      { x: cx + 14, y: 68 },
+      { x: cx - 14, y: 68 },
+      { x: cx - 24, y: 48 },
+    ];
+    poly(g, torso, body, 1);
+    outline(g, torso, rim, 0.9, 1.8);
+
+    // Ivory shoulder plates
+    poly(g, [{ x: cx - 26, y: 14 }, { x: cx - 14, y: 14 }, { x: cx - 14, y: 30 }, { x: cx - 28, y: 26 }], 0xf3f4f6, 1);
+    poly(g, [{ x: cx + 14, y: 14 }, { x: cx + 26, y: 14 }, { x: cx + 28, y: 26 }, { x: cx + 14, y: 30 }], 0xf3f4f6, 1);
+
+    // Amber visor conduit
+    g.fillStyle(amber, 0.95);
+    g.fillRect(cx - 10, 24, 20, 5);
+
+    // Plasma blade attachment on right arm
+    poly(g, [{ x: cx + 24, y: 36 }, { x: cx + 32, y: 56 }, { x: cx + 22, y: 48 }], amber, 0.95);
+  });
+}
+
+/** Level 5: Firewall Sentinel — towering construct with heavy frontal barrier plates and amber crest. */
+const FIREWALL_SENTINEL_W = 84;
+const FIREWALL_SENTINEL_H = 94;
+function firewallSentinelTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_firewall_sentinel_hit' : 'enemy_firewall_sentinel';
+  const body = hit ? 0xffffff : 0x0c0e12;
+  const rim = hit ? 0xffffff : 0xd1d5db;
+  const amber = hit ? 0xffffff : 0xf59e0b;
+
+  forge(scene, key, FIREWALL_SENTINEL_W, FIREWALL_SENTINEL_H, (g) => {
+    const cx = FIREWALL_SENTINEL_W / 2;
+    // Towering monolithic chassis
+    const torso = [
+      { x: cx - 28, y: 18 },
+      { x: cx + 28, y: 18 },
+      { x: cx + 36, y: 52 },
+      { x: cx + 24, y: 86 },
+      { x: cx - 24, y: 86 },
+      { x: cx - 36, y: 52 },
+    ];
+    poly(g, torso, body, 1);
+    outline(g, torso, rim, 0.95, 2);
+
+    // Heavy ivory defense crest
+    poly(g, [{ x: cx - 22, y: 24 }, { x: cx + 22, y: 24 }, { x: cx + 18, y: 60 }, { x: cx - 18, y: 60 }], 0xe5e7eb, 1);
+    outline(g, [{ x: cx - 22, y: 24 }, { x: cx + 22, y: 24 }, { x: cx + 18, y: 60 }, { x: cx - 18, y: 60 }], 0x4b5563, 0.9, 1.5);
+
+    // Central amber reactor core
+    energyCore(g, cx, 42, 10, amber, 0xffffff, 0x1f1406, 1);
+  });
+}
+
+/** Electric Amber Security Bolt — fired by Security Drones & Firewall Sentinels. */
+function securityBoltTexture(scene: Phaser.Scene) {
+  forge(scene, 'proj_security_bolt', 24, 24, (g) => {
+    g.fillStyle(0xd97706, 0.95);
+    g.fillCircle(12, 12, 11);
+    g.fillStyle(0xf59e0b, 0.9);
+    g.fillCircle(12, 12, 7);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(12, 12, 3);
+  });
+}
+
+const CROWN_STALKER_W = 64;
+const CROWN_STALKER_H = 48;
+const DOMINION_MARKSMAN_W = 54;
+const DOMINION_MARKSMAN_H = 58;
+const CROWN_SENTINEL_W = 78;
+const CROWN_SENTINEL_H = 88;
+
+/** Crown Stalker — aggressive quad-pedal pursuit predator in The Black Crown. */
+function crownStalkerTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_crown_stalker_hit' : 'enemy_crown_stalker';
+  const body = hit ? 0xffffff : 0x07070a;
+  const rim = hit ? 0xffffff : 0x350812;
+  const core = hit ? 0xffffff : 0x641329;
+
+  forge(scene, key, CROWN_STALKER_W, CROWN_STALKER_H, (g) => {
+    const cx = CROWN_STALKER_W / 2;
+    // Sleek predatory chassis
+    const torso = [
+      { x: cx - 24, y: 18 },
+      { x: cx + 18, y: 12 },
+      { x: cx + 30, y: 22 },
+      { x: cx + 22, y: 34 },
+      { x: cx - 18, y: 36 },
+      { x: cx - 28, y: 28 },
+    ];
+    poly(g, torso, body, 1);
+    outline(g, torso, rim, 0.95, 2);
+
+    // Ashen metal clawed limbs
+    [-20, -6, 10, 22].forEach((dx, i) => {
+      poly(g, [
+        { x: cx + dx - 3, y: 32 },
+        { x: cx + dx + 3, y: 32 },
+        { x: cx + dx + (i % 2 === 0 ? 5 : -5), y: 46 },
+      ], 0x77747a, 1);
+    });
+
+    // Blood maroon tracking visor
+    energyCore(g, cx + 16, 20, 5, core, 0xffffff, 0x050204, 1);
+  });
+}
+
+/** Dominion Marksman — hovering ranged sniper with abyss navy plating. */
+function dominionMarksmanTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_dominion_marksman_hit' : 'enemy_dominion_marksman';
+  const body = hit ? 0xffffff : 0x071426;
+  const rim = hit ? 0xffffff : 0x203858;
+  const core = hit ? 0xffffff : 0x641329;
+
+  forge(scene, key, DOMINION_MARKSMAN_W, DOMINION_MARKSMAN_H, (g) => {
+    const cx = DOMINION_MARKSMAN_W / 2;
+    // Elevated angular sniper chassis
+    const hull = [
+      { x: cx, y: 10 },
+      { x: cx + 24, y: 24 },
+      { x: cx + 18, y: 46 },
+      { x: cx, y: 54 },
+      { x: cx - 18, y: 46 },
+      { x: cx - 24, y: 24 },
+    ];
+    poly(g, hull, body, 1);
+    outline(g, hull, rim, 0.95, 2);
+
+    // Midnight steel-blue stabilizer fins
+    poly(g, [{ x: cx - 24, y: 20 }, { x: cx - 16, y: 36 }, { x: cx - 26, y: 40 }], 0x203858, 0.9);
+    poly(g, [{ x: cx + 24, y: 20 }, { x: cx + 16, y: 36 }, { x: cx + 26, y: 40 }], 0x203858, 0.9);
+
+    // Long sniper barrel
+    g.fillStyle(0x77747a, 0.95);
+    g.fillRect(cx - 3, 44, 6, 12);
+
+    // Blood maroon targeting eye
+    energyCore(g, cx, 28, 6, core, 0xffffff, 0x030810, 1);
+  });
+}
+
+/** Crown Sentinel — towering void-black armor construct with interruptible power strike. */
+function crownSentinelTexture(scene: Phaser.Scene, hit: boolean) {
+  const key = hit ? 'enemy_crown_sentinel_hit' : 'enemy_crown_sentinel';
+  const body = hit ? 0xffffff : 0x07070a;
+  const rim = hit ? 0xffffff : 0x350812;
+  const core = hit ? 0xffffff : 0x641329;
+
+  forge(scene, key, CROWN_SENTINEL_W, CROWN_SENTINEL_H, (g) => {
+    const cx = CROWN_SENTINEL_W / 2;
+    // Massive monolithic obsidian armor
+    const chassis = [
+      { x: cx - 32, y: 18 },
+      { x: cx + 32, y: 18 },
+      { x: cx + 38, y: 56 },
+      { x: cx + 24, y: 84 },
+      { x: cx - 24, y: 84 },
+      { x: cx - 38, y: 56 },
+    ];
+    poly(g, chassis, body, 1);
+    outline(g, chassis, rim, 0.95, 2.5);
+
+    // Pale ash reinforced chestplate
+    poly(g, [{ x: cx - 20, y: 24 }, { x: cx + 20, y: 24 }, { x: cx + 16, y: 58 }, { x: cx - 16, y: 58 }], 0xc5bdb4, 1);
+    outline(g, [{ x: cx - 20, y: 24 }, { x: cx + 20, y: 24 }, { x: cx + 16, y: 58 }, { x: cx - 16, y: 58 }], 0x77747a, 0.9, 1.5);
+
+    // Midnight steel-blue buckler trim
+    poly(g, [{ x: cx - 34, y: 32 }, { x: cx - 24, y: 32 }, { x: cx - 26, y: 64 }, { x: cx - 36, y: 60 }], 0x203858, 0.95);
+
+    // Glowing blood-maroon reactor core
+    energyCore(g, cx, 42, 10, core, 0xffffff, 0x020204, 1);
+  });
+}
+
+/** Blood Maroon Crown Bolt — fired by Dominion Marksmen and Ra-One. */
+function crownBoltTexture(scene: Phaser.Scene) {
+  forge(scene, 'proj_crown_bolt', 32, 16, (g) => {
+    // Midnight steel-blue trailing energy
+    poly(g, [{ x: 2, y: 8 }, { x: 18, y: 2 }, { x: 30, y: 8 }, { x: 18, y: 14 }], 0x203858, 0.85);
+    // Blood maroon piercing core
+    poly(g, [{ x: 8, y: 8 }, { x: 20, y: 4 }, { x: 28, y: 8 }, { x: 20, y: 12 }], 0x641329, 0.95);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(24, 8, 3);
+  });
+}
+
+/** Blood Maroon Void Singularity Orb. */
+function crownOrbTexture(scene: Phaser.Scene) {
+  forge(scene, 'proj_crown_orb', 48, 48, (g) => {
+    g.fillStyle(0x350812, 0.9);
+    g.fillCircle(24, 24, 22);
+    g.fillStyle(0x641329, 0.95);
+    g.fillCircle(24, 24, 16);
+    g.fillStyle(0x203858, 0.8);
+    g.fillCircle(24, 24, 9);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(24, 24, 4);
+  });
+}
+
 export function buildEnemies(scene: Phaser.Scene) {
   droneTexture(scene, false);
   droneTexture(scene, true);
@@ -444,6 +691,25 @@ export function buildEnemies(scene: Phaser.Scene) {
   gravitySentinelTexture(scene, false);
   gravitySentinelTexture(scene, true);
   voidPlasmaTexture(scene);
+
+  // Level 5 enemies
+  securityDroneTexture(scene, false);
+  securityDroneTexture(scene, true);
+  protocolEnforcerTexture(scene, false);
+  protocolEnforcerTexture(scene, true);
+  firewallSentinelTexture(scene, false);
+  firewallSentinelTexture(scene, true);
+  securityBoltTexture(scene);
+
+  // Level 6 enemies & projectiles
+  crownStalkerTexture(scene, false);
+  crownStalkerTexture(scene, true);
+  dominionMarksmanTexture(scene, false);
+  dominionMarksmanTexture(scene, true);
+  crownSentinelTexture(scene, false);
+  crownSentinelTexture(scene, true);
+  crownBoltTexture(scene);
+  crownOrbTexture(scene);
 }
 
 export const ENEMY_FRAME = {
@@ -456,5 +722,11 @@ export const ENEMY_FRAME = {
   void_drone: { w: VOID_DRONE_W, h: VOID_DRONE_H },
   rift_stalker: { w: RIFT_STALKER_W, h: RIFT_STALKER_H },
   gravity_sentinel: { w: GRAVITY_SENTINEL_W, h: GRAVITY_SENTINEL_H },
+  security_drone: { w: SECURITY_DRONE_W, h: SECURITY_DRONE_H },
+  protocol_enforcer: { w: PROTOCOL_ENFORCER_W, h: PROTOCOL_ENFORCER_H },
+  firewall_sentinel: { w: FIREWALL_SENTINEL_W, h: FIREWALL_SENTINEL_H },
+  crown_stalker: { w: CROWN_STALKER_W, h: CROWN_STALKER_H },
+  dominion_marksman: { w: DOMINION_MARKSMAN_W, h: DOMINION_MARKSMAN_H },
+  crown_sentinel: { w: CROWN_SENTINEL_W, h: CROWN_SENTINEL_H },
 } as const;
 

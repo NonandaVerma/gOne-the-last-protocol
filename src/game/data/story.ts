@@ -106,14 +106,16 @@ export const REALM_TRANSITIONS: Record<number, string[]> = {
     'GRAVITATIONAL FIELDS FRACTURE ACROSS SIX UNSTABLE SECTORS.',
   ],
   5: [
-    'LIFE FOUND THE RUINS AND GREW THROUGH THEM.',
-    'IT GREW THROUGH THE CORRUPTION TOO.',
-    'EVERYTHING YOU HAVE LEARNED IS REQUIRED HERE.',
+    'THE GRAVITATIONAL ANOMALY COLLAPSES BEHIND YOU.',
+    'ENTERING REALM V — THE OVERWRITE.',
+    'AN ARTIFICIAL REALITY PHYSICALIZES. HOSTILE PROTOCOLS REWRITE THE WORLD.',
+    'PENETRATE THE SIX SECTORS AND OVERRIDE THE CORRUPTED CORE.',
   ],
   6: [
-    'THE SEAM IS FULLY OPEN.',
-    'ORDER AND ENTROPY STAND ON THE SAME GROUND.',
-    'ONE FINAL STRIKE DECIDES THE EXISTENCE OF THIS WORLD.',
+    'THE ARTIFICIAL REALITY DISSOLVES BEHIND YOU.',
+    'ENTERING REALM VI — THE BLACK CROWN.',
+    'RA-ONE CONSOLIDATES HIS POWER WITHIN THE THRONE OF RUIN.',
+    'MASTER PROTOCOL BREAK AND CONFRONT THE FINAL PROTOCOL.',
   ],
 };
 
@@ -160,6 +162,16 @@ export const REALM_REVEALS: Record<number, RealmRevealConfig> = {
       { from: 0.42, to: 0.58, text: "Deep inside, a corrupted dimensional reactor fractures the bedrock of reality." },
       { from: 0.62, to: 0.78, text: "At the threshold of the inner sanctum, The Last Warden awakens." },
       { from: 0.82, to: 0.96, text: "Breach the citadel. Stabilize the core. Enter Realm II — INFERNAL FORTRESS." },
+    ],
+  },
+  3: {
+    video: '/images/gOne-level3.mp4',
+    cues: [
+      { from: 0.04, to: 0.18, text: 'The Infernal Fortress crumbles into ash behind you. The network fractures deeper into the dark.' },
+      { from: 0.22, to: 0.38, text: 'Beyond the volcanic crucible lies an ancient biomechanical megastructure — The Verdant Abyss.' },
+      { from: 0.42, to: 0.58, text: 'Living rootlines and colossal canopy spires pulse with alien bio-luminescent power.' },
+      { from: 0.62, to: 0.78, text: 'At the heart of the organic cathedral, The Worldseed Guardian awakens.' },
+      { from: 0.82, to: 0.96, text: 'Harmonize the rootlines. Restore the living light. Enter Realm III — THE VERDANT ABYSS.' },
     ],
   },
 };

@@ -34,7 +34,8 @@ type ActionId =
   | 'hazard'
   | 'slam'
   | 'beam'
-  | 'blink';
+  | 'blink'
+  | 'crown_channel';
 
 /**
  * RA-ONE — the boss.
@@ -76,6 +77,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
   private pending: Phaser.Time.TimerEvent[] = [];
   private telegraphTweens: Phaser.Tweens.Tween[] = [];
   private beamTracker?: Phaser.Time.TimerEvent;
+  private isCrownChanneling = false;
 
   constructor(d: RaOneDeps) {
     super(d.scene, d.x, d.y, 'raone_idle', 0);
@@ -134,12 +136,22 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.play('raone-idle');
     this.applyGlow();
 
-    // Level 4: The Void Sovereign unique dark cosmic palette & aura
+    // Level 4, 5, 6 unique boss styling
     if (this.level === 4) {
       this.setTint(0xc084fc);
       if (this.aura) this.aura.setTint(0x9333ea);
       if (this.plume) this.plume.setTint(0xa855f7);
       if (this.ring) this.ring.setTint(0xa855f7);
+    } else if (this.level === 5) {
+      this.setTint(0xf59e0b);
+      if (this.aura) this.aura.setTint(0xd97706);
+      if (this.plume) this.plume.setTint(0xf59e0b);
+      if (this.ring) this.ring.setTint(0xfbbf24);
+    } else if (this.level === 6) {
+      this.setTint(0x641329);
+      if (this.aura) this.aura.setTint(0x350812);
+      if (this.plume) this.plume.setTint(0x641329);
+      if (this.ring) this.ring.setTint(0x641329);
     }
 
     // Dramatic entrance before the AI takes over.
@@ -148,15 +160,24 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
   }
 
   private get bossEnergyColor(): number {
-    return this.level === 4 ? 0xc084fc : VILLAIN.energy;
+    if (this.level === 6) return 0x641329;
+    if (this.level === 5) return 0xf59e0b;
+    if (this.level === 4) return 0xc084fc;
+    return VILLAIN.energy;
   }
 
   private get boltTexture(): string {
-    return this.level === 4 ? 'proj_void_plasma' : 'proj_raone_bolt';
+    if (this.level === 6) return 'proj_crown_bolt';
+    if (this.level === 5) return 'proj_security_bolt';
+    if (this.level === 4) return 'proj_void_plasma';
+    return 'proj_raone_bolt';
   }
 
   private get orbTexture(): string {
-    return this.level === 4 ? 'proj_void_plasma' : 'proj_raone_orb';
+    if (this.level === 6) return 'proj_crown_orb';
+    if (this.level === 5) return 'proj_security_bolt';
+    if (this.level === 4) return 'proj_void_plasma';
+    return 'proj_raone_orb';
   }
 
   private applyGlow() {
@@ -206,6 +227,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     this.telegraphTweens = [];
     this.beamTracker?.remove(false);
     this.beamTracker = undefined;
+    this.isCrownChanneling = false;
     this.clearTint();
   }
 
@@ -298,6 +320,7 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
     if (m.hasHazards) options.push(['hazard', 14 + aggression * 8]);
     if (m.hasBeams) options.push(['beam', 20 + aggression * 14]);
     if (m.canTeleport) options.push(['blink', 16]);
+    if (this.level === 6 && this.phase >= 2) options.push(['crown_channel', 26 + aggression * 14]);
 
     const total = options.reduce((s, [, w]) => s + w, 0);
     let roll = Math.random() * total;
@@ -329,6 +352,8 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
         return this.actBeam();
       case 'blink':
         return this.actBlink();
+      case 'crown_channel':
+        return this.actCrownChannel();
     }
   }
 
@@ -366,23 +391,120 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
         onUpdate: (tw) => {
           if (!this.active) return;
           const v = tw.getValue() ?? 0;
+          const defaultTint = this.level === 6 ? 0x641329 : this.level === 5 ? 0xf59e0b : (this.level === 4 ? 0xc084fc : undefined);
           if (Math.sin(v * Math.PI * 10) > 0) this.setTint(this.bossEnergyColor).setTintMode(Phaser.TintModes.FILL);
-          else if (this.level === 4) this.setTint(0xc084fc);
+          else if (defaultTint !== undefined) this.setTint(defaultTint);
           else this.clearTint();
         },
         onComplete: () => {
-          if (this.level === 4) this.setTint(0xc084fc);
+          if (this.level === 6) this.setTint(0x641329);
+          else if (this.level === 5) this.setTint(0xf59e0b);
+          else if (this.level === 4) this.setTint(0xc084fc);
           else this.clearTint();
         },
       })
     );
 
     this.later(duration, () => {
-      if (this.level === 4) this.setTint(0xc084fc);
+      if (this.level === 6) this.setTint(0x641329);
+      else if (this.level === 5) this.setTint(0xf59e0b);
+      else if (this.level === 4) this.setTint(0xc084fc);
       else this.clearTint();
       this.enter('attack', 300);
       this.play('raone-strike', true);
       then();
+    });
+  }
+
+  /** Protocol Break hook: returns true if Ra-One is currently channeling his breakable attack. */
+  public isInterruptibleForProtocolBreak(): boolean {
+    return this.active && this.bossState === 'telegraph' && this.isCrownChanneling;
+  }
+
+  /** Force interrupt and stun from Protocol Break. */
+  public interruptProtocolBreak(durationMs = 3500) {
+    if (this.bossState === 'defeated' || !this.active) return;
+    this.isCrownChanneling = false;
+    this.clearPending();
+    this.ring?.setVisible(false);
+    this.beamGuide?.clear();
+
+    // Stunned into exposed recovery window
+    this.enter('recover', durationMs);
+    this.play('raone-stagger', true);
+    this.currentHealth = Math.max(0, this.currentHealth - 3);
+    EventBus.emit(GAME_EVENTS.BOSS_HEALTH_CHANGED, {
+      current: this.currentHealth,
+      max: this.maxHealth,
+    });
+
+    this.setTint(0x00f0ff);
+    this.scene.time.delayedCall(500, () => {
+      if (this.active && this.bossState === 'recover') this.setTint(0x7fe3ff);
+    });
+
+    if (this.currentHealth <= 0) {
+      this.defeat();
+      return;
+    }
+
+    this.later(durationMs, () => {
+      if (this.bossState === 'recover') {
+        this.clearTint();
+        this.busy = false;
+        this.bossState = 'idle';
+        this.play('raone-idle', true);
+        this.scheduleNext(200);
+      }
+    });
+  }
+
+  private actCrownChannel() {
+    this.faceTarget();
+    this.isCrownChanneling = true;
+    const channelDuration = 2400;
+
+    this.enter('telegraph', channelDuration);
+    this.play('raone-charge', true);
+    this.setTint(0x641329);
+
+    if (this.ring) {
+      this.ring.setVisible(true);
+      this.ring.setPosition(this.x, this.y - 12);
+      this.ring.setAlpha(1);
+      this.ring.setScale(1.8);
+      this.ring.setTint(0x00f0ff);
+      this.telegraphTweens.push(
+        this.scene.tweens.add({
+          targets: this.ring,
+          scale: 0.35,
+          rotation: Math.PI * 2,
+          duration: channelDuration,
+          ease: 'Linear',
+          onComplete: () => this.ring?.setVisible(false),
+        })
+      );
+    }
+
+    this.later(channelDuration, () => {
+      if (!this.isCrownChanneling || this.bossState === 'defeated') return;
+      this.isCrownChanneling = false;
+      this.ring?.setVisible(false);
+      this.clearTint();
+
+      // If not interrupted, execute apocalyptic 8-direction crown eruption!
+      this.enter('attack', 450);
+      this.play('raone-strike', true);
+      AudioManager.getInstance().playExplosion();
+      this.juice.shake(0.03, 500);
+      this.juice.flash(0x641329, 0.5, 300);
+
+      const angles = [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75].map((t) => t * Math.PI);
+      angles.forEach((ang) => {
+        this.shoot(ang, PJ.spreadShot.speed * 1.1, this.boltTexture, 'proj-bolt', { scale: 0.8 });
+      });
+
+      this.finishAction(750);
     });
   }
 
@@ -653,7 +775,9 @@ export class RaOne extends Phaser.Physics.Arcade.Sprite {
         stretchTo: reach,
         bodyHeight: 26,
       });
-      if (beam && this.level === 4) {
+      if (beam && this.level === 5) {
+        beam.setTint(0xf59e0b);
+      } else if (beam && this.level === 4) {
         beam.setTint(0xc084fc);
       }
       if (beam) {

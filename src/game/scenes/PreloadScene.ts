@@ -8,22 +8,13 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload() {
-    // Show a sleek sci-fi loading bar
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
 
-    const progressBar = this.add.graphics();
-    const progressBox = this.add.graphics();
-    progressBox.fillStyle(0x0b1120, 0.8);
-    progressBox.fillRect(width / 2 - 160, height / 2 - 15, 320, 30);
-    progressBox.lineStyle(2, 0x00f0ff, 0.8);
-    progressBox.strokeRect(width / 2 - 160, height / 2 - 15, 320, 30);
-
-    const loadingText = this.add.text(width / 2, height / 2 - 40, 'INITIALIZING PROTOCOL...', {
-      fontFamily: 'Orbitron, sans-serif',
-      fontSize: '18px',
-      color: '#00f0ff',
-    }).setOrigin(0.5, 0.5);
+    // Clean dark obsidian backdrop — no raw wireframes on canvas
+    const bg = this.add.graphics();
+    bg.fillStyle(0x030712, 1);
+    bg.fillRect(0, 0, width, height);
 
     /* Painted backdrop per realm. These reuse existing key art rather than
        inventing asset paths — the filenames differ from the realm names
@@ -72,20 +63,28 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('bg_realm4_stage5', '/images/level4-stage5.png'); // The Devouring Singularity
     this.load.image('bg_realm4_stage6', '/images/level4-stage6.png'); // The Void Sovereign
 
-    this.load.image('bg_realm5', '/images/Six Realms of the Shattered Protocol.png'); // Celestial Forest Sanctuary
-    this.load.image('bg_realm6', '/images/Six Realms of the Shattered Protocol.png'); // Final Arena
+    /* Realm 5's six-stage internal progression (The Entry Protocol -> The Recursive Engine ->
+       The Desync Expanse -> The Null Foundry -> The Firewall Citadel -> The Overwrite Core). */
+    this.load.image('bg_realm5', '/images/level5-stage1.png');        // The Overwrite default
+    this.load.image('bg_realm5_stage1', '/images/level5-stage1.png'); // The Entry Protocol
+    this.load.image('bg_realm5_stage2', '/images/level5-stage2.png'); // The Recursive Engine
+    this.load.image('bg_realm5_stage3', '/images/level5-stage3.png'); // The Desync Expanse
+    this.load.image('bg_realm5_stage4', '/images/level5-stage4.png'); // The Null Foundry
+    this.load.image('bg_realm5_stage5', '/images/level5-stage5.png'); // The Firewall Citadel
+    this.load.image('bg_realm5_stage6', '/images/level5-stage6.png'); // The Overwrite Core
 
-    this.load.on('progress', (value: number) => {
-      progressBar.clear();
-      progressBar.fillStyle(0x00f0ff, 1);
-      progressBar.fillRect(width / 2 - 155, height / 2 - 10, 310 * value, 20);
-    });
+    /* Realm 6's six-stage internal progression (The Crown's Shadow -> The Harrowed Gate ->
+       The Hunting Grounds -> The Broken Sanctum -> The Red Wake -> Ra-One: The Final Protocol). */
+    this.load.image('bg_realm6', '/images/level6-stage1.png');        // The Black Crown default
+    this.load.image('bg_realm6_stage1', '/images/level6-stage1.png'); // The Crown's Shadow
+    this.load.image('bg_realm6_stage2', '/images/level6-stage2.png'); // The Harrowed Gate
+    this.load.image('bg_realm6_stage3', '/images/level6-stage3.png'); // The Hunting Grounds
+    this.load.image('bg_realm6_stage4', '/images/level6-stage4.png'); // The Broken Sanctum
+    this.load.image('bg_realm6_stage5', '/images/level6-stage5.png'); // The Red Wake
+    this.load.image('bg_realm6_stage6', '/images/level6-stage6.png'); // Ra-One: The Final Protocol
 
-    this.load.on('complete', () => {
-      progressBar.destroy();
-      progressBox.destroy();
-      loadingText.destroy();
-    });
+    // Defeat background
+    this.load.image('bg_defeat', '/images/defeat.png');
   }
 
   create() {

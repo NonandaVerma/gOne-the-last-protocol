@@ -715,57 +715,90 @@ export const LEVELS: Record<number, LevelConfig> = {
      ========================================================================= */
   5: {
     id: 5,
-    name: 'ANCIENT FOREST',
-    subtitle: 'Realm V — Where the Protocol Still Breathes',
-    objective: 'Cut through the overgrown ruin before the rot reaches the core.',
+    name: 'THE OVERWRITE',
+    subtitle: 'Realm V — The Hostile Reality Rewrite',
+    objective: 'Infiltrate the six sectors, override the corrupted architecture, and breach the core.',
     playerHealth: 3,
-    bossHealth: 10,
+    bossHealth: 11,
     gravity: 1750,
-    openingTaunt: '"Even life here answers to me now."',
+    openingTaunt: '"Unauthorized entity detected. Commencing protocol overwrite."',
     environment: REALMS[5],
-    difficulty: { bossTempoScale: 0.85, hazardWarnScale: 0.9, relicSpawnSeconds: 16 },
+    difficulty: { bossTempoScale: 0.85, hazardWarnScale: 0.9, relicSpawnSeconds: 15 },
     arena: {
-      worldWidth: 4200,
+      worldWidth: 8600,
       groundTop: GROUND_TOP,
-      playerSpawnX: 190,
-      bossSpawnX: 3620,
-      arenaStartX: 2420,
+      playerSpawnX: 180,
+      bossSpawnX: 7850,
+      arenaStartX: 7150,
       hasLava: false,
       platforms: [
-        { x: 600, y: 536, width: 220 },
-        { x: 900, y: 500, width: 180, behaviour: 'collapsing' },
-        { x: 1220, y: 470, width: 200, behaviour: 'moving', travelX: 260, travelMs: 2200 },
-        { x: 1580, y: 496, width: 190, behaviour: 'phasing', phaseOnMs: 1600, phaseOffMs: 1100, phaseOffsetMs: 0 },
-        { x: 1880, y: 452, width: 190, behaviour: 'phasing', phaseOnMs: 1600, phaseOffMs: 1100, phaseOffsetMs: 900 },
-        { x: 2180, y: 500, width: 220, behaviour: 'collapsing' },
-        // Arena
-        { x: 2700, y: 486, width: 280 },
-        { x: 3160, y: 412, width: 300 },
-        { x: 3700, y: 486, width: 280 },
+        // STAGE 2: Moving Mechanical Lifts in Recursive Engine
+        { x: 1740, y: 460, width: 200, behaviour: 'moving', travelY: -140, travelMs: 2200, textureKey: 'platform_l5_machinery' },
+        { x: 2020, y: 380, width: 200, behaviour: 'moving', travelX: 180, travelMs: 2400, textureKey: 'platform_l5_machinery' },
+
+        // STAGE 4: Null Foundry Conveyor Assembly
+        { x: 4480, y: 520, width: 190, behaviour: 'moving', travelY: -120, travelMs: 2000, textureKey: 'platform_l5_machinery' },
       ],
-      gaps: [[760, 1040], [1380, 1680], [2020, 2300]],
+      gaps: [
+        [760, 1040],   // Stage 1: Broken entry breach (spanned by Reconfigurable Bridge)
+        [1780, 1920],  // Stage 2: Recursive Engine assembly gap
+        [3380, 3680],  // Stage 3: Desync Expanse chasm (spanned by Desync Bridge)
+        [5260, 5440],  // Stage 4: Null Foundry conveyor pit
+      ],
       staticHazards: [
-        { kind: 'corruption_zone', x: 1220, y: GROUND_TOP, width: 260, warnMs: 600, activeMs: 1200, cooldownMs: 1400, offsetMs: 0 },
-        { kind: 'corruption_zone', x: 1900, y: GROUND_TOP, width: 260, warnMs: 600, activeMs: 1200, cooldownMs: 1400, offsetMs: 1300 },
-        { kind: 'laser_gate', x: 1580, y: GROUND_TOP, width: 14, height: 280, warnMs: 550, activeMs: 800, cooldownMs: 1000, offsetMs: 500 },
-        { kind: 'spikes', x: 2340, y: GROUND_TOP, width: 180 },
+        // Stage 1: Security Barrier laser gate
+        { kind: 'laser_gate', x: 1040, y: GROUND_TOP, width: 14, height: 260, warnMs: 600, activeMs: 800, cooldownMs: 1400, offsetMs: 0 },
+
+        // Stage 3: Desync Expanse security beam
+        { kind: 'laser_gate', x: 3720, y: GROUND_TOP, width: 14, height: 260, warnMs: 600, activeMs: 800, cooldownMs: 1200, offsetMs: 600 },
+
+        // Stage 4: Null Foundry reconstruction beam
+        { kind: 'laser_gate', x: 5120, y: GROUND_TOP, width: 14, height: 260, warnMs: 500, activeMs: 750, cooldownMs: 1000, offsetMs: 300 },
+
+        // Stage 5: Citadel security laser perimeter
+        { kind: 'laser_gate', x: 6720, y: GROUND_TOP, width: 14, height: 260, warnMs: 500, activeMs: 800, cooldownMs: 1100, offsetMs: 0 },
       ],
       pickups: [
-        { x: 1580, y: 430, type: 'phoenix_core' },
-        { x: 1880, y: 386, type: 'rune_of_ruin' },
-        { x: 2180, y: 434, type: 'overdrive_shard' },
+        // Stage 1: Protocol Cache
+        { x: 880, y: 460, type: 'phoenix_core' },
+
+        // Stage 2: Elevated Overdrive Capacitor on secret gantry
+        { x: 2540, y: 170, type: 'overdrive_shard' },
+
+        // Stage 3: Integrity Cell on upper desync shelf
+        { x: 3840, y: 360, type: 'rune_of_ruin' },
+
+        // Stage 4: Foundry Protocol Cache
+        { x: 4980, y: 460, type: 'phoenix_core' },
+
+        // Stage 5: Citadel Overdrive Shard
+        { x: 6140, y: 380, type: 'overdrive_shard' },
+
+        // Stage 6: Arena Central Vantage Cache
+        { x: 7700, y: 280, type: 'phoenix_core' },
       ],
-      // The realm's own identity is "every mechanic layered" — enemy
-      // pressure layers the same way: two drones holding the two solid-
-      // ground stretches between the three gaps, and two seekers watching
-      // the phasing-bridge section and the final approach to the arena gate
-      // from range, same fairness rule as The Voidborn Abyss (ranged only
-      // near precision terrain, melee only on genuinely solid ground).
       enemies: [
-        { kind: 'drone', x: 1150, y: GROUND_TOP - 60, patrolMin: 1090, patrolMax: 1330 },
-        { kind: 'drone', x: 1800, y: GROUND_TOP - 60, patrolMin: 1720, patrolMax: 1960 },
-        { kind: 'seeker', x: 1580, y: 300 },
-        { kind: 'seeker', x: 2340, y: 260 },
+        // Stage 1: Entry Protocol patrol
+        { kind: 'security_drone', x: 1120, y: 360 },
+        { kind: 'security_drone', x: 1260, y: 320 },
+
+        // Stage 2: Recursive Engine garrison
+        { kind: 'protocol_enforcer', x: 1960, y: GROUND_TOP - 60, patrolMin: 1880, patrolMax: 2060 },
+        { kind: 'security_drone', x: 2360, y: 260 },
+
+        // Stage 3: Desync Expanse defenders
+        { kind: 'protocol_enforcer', x: 3120, y: GROUND_TOP - 60, patrolMin: 3000, patrolMax: 3240 },
+        { kind: 'security_drone', x: 3840, y: 340 },
+        { kind: 'protocol_enforcer', x: 4060, y: GROUND_TOP - 60, patrolMin: 3960, patrolMax: 4160 },
+
+        // Stage 4: Null Foundry heavy unit & drone
+        { kind: 'firewall_sentinel', x: 4560, y: GROUND_TOP - 60, patrolMin: 4420, patrolMax: 4680 },
+        { kind: 'security_drone', x: 4860, y: 360 },
+
+        // Stage 5: Firewall Citadel Elite Vanguard
+        { kind: 'protocol_enforcer', x: 5880, y: GROUND_TOP - 60, patrolMin: 5740, patrolMax: 6020 },
+        { kind: 'firewall_sentinel', x: 6480, y: GROUND_TOP - 60, patrolMin: 6360, patrolMax: 6620 },
+        { kind: 'security_drone', x: 6720, y: 340 },
       ],
     },
     bossMechanics: {
@@ -777,51 +810,104 @@ export const LEVELS: Record<number, LevelConfig> = {
       canTeleport: true,
       attackIntervalMin: 850,
       attackIntervalMax: 1200,
-      projectileSpeedScale: 1.15,
+      projectileSpeedScale: 1.18,
     },
   },
 
   /* =========================================================================
-     VI — FINAL ARENA
-     Short, dense approach; the realm is mostly the fight.
+     VI — THE BLACK CROWN
+     Six-stage grand finale campaign: corrupted combat, lethal architecture,
+     Protocol Break combat interrupts, and the four-phase Ra-One confrontation.
      ========================================================================= */
   6: {
     id: 6,
-    name: 'FINAL ARENA',
-    subtitle: 'Realm VI — The Last Protocol. One Ending Remains.',
-    objective: 'End it on the seam.',
-    playerHealth: 2,
-    bossHealth: 12,
+    name: 'THE BLACK CROWN',
+    subtitle: 'Realm VI — The Final Protocol. One Ending Remains.',
+    objective: 'Traverse the six sectors of the Black Crown, execute Protocol Break, and destroy Ra-One.',
+    playerHealth: 3,
+    bossHealth: 14,
     gravity: 1750,
-    openingTaunt: '"Let this world witness its final error."',
+    openingTaunt: '"All protocols lead to this throne, G-ONE. Here, your light is extinguished."',
     environment: REALMS[6],
     difficulty: { bossTempoScale: 0.8, hazardWarnScale: 0.85, relicSpawnSeconds: 12 },
     arena: {
-      worldWidth: 3800,
+      worldWidth: 8600,
       groundTop: GROUND_TOP,
-      playerSpawnX: 190,
-      bossSpawnX: 3180,
-      arenaStartX: 1700,
-      hasLava: true,
+      playerSpawnX: 180,
+      bossSpawnX: 7900,
+      arenaStartX: 7150,
+      hasLava: false,
       platforms: [
-        { x: 560, y: 520, width: 200, behaviour: 'collapsing' },
-        { x: 880, y: 474, width: 190, behaviour: 'phasing', phaseOnMs: 1500, phaseOffMs: 1000, phaseOffsetMs: 0 },
-        { x: 1200, y: 452, width: 200, behaviour: 'moving', travelX: 280, travelMs: 2000 },
-        { x: 1540, y: 500, width: 220 },
-        // Arena — symmetrical around the seam, the way the key art frames it.
-        { x: 2040, y: 486, width: 300 },
-        { x: 2560, y: 400, width: 340 },
-        { x: 3080, y: 486, width: 300 },
+        // STAGE 2: Moving Gantry Lift
+        { x: 1860, y: 460, width: 200, behaviour: 'moving', travelY: -110, travelMs: 2200, textureKey: 'platform_l6_abyss_steel' },
+
+        // STAGE 3: Hunting Grounds Shuttle
+        { x: 3250, y: 430, width: 200, behaviour: 'moving', travelX: 160, travelMs: 2400, textureKey: 'platform_l6_black_metal' },
+
+        // STAGE 5: Ascension Ferry
+        { x: 6020, y: 450, width: 200, behaviour: 'moving', travelY: -100, travelMs: 2100, textureKey: 'platform_l6_wake' },
       ],
-      gaps: [[700, 1000], [1340, 1620]],
+      gaps: [
+        [420, 580],    // Stage 1 Gap 1 (160px span)
+        [840, 1020],   // Stage 1 Gap 2 (180px span)
+        [1950, 2120],  // Stage 2 Gap (170px span)
+        [3350, 3550],  // Stage 3 Gap (200px span)
+        [4650, 4850],  // Stage 4 Gap (200px span)
+        [6100, 6300],  // Stage 5 Gap (200px span)
+      ],
       staticHazards: [
-        { kind: 'laser_gate', x: 880, y: GROUND_TOP, width: 14, height: 300, warnMs: 500, activeMs: 750, cooldownMs: 950, offsetMs: 0 },
-        { kind: 'corruption_zone', x: 1200, y: GROUND_TOP, width: 280, warnMs: 550, activeMs: 1100, cooldownMs: 1250, offsetMs: 600 },
-        { kind: 'spikes', x: 1480, y: GROUND_TOP, width: 160 },
+        // Stage 1: Security laser gate
+        { kind: 'laser_gate', x: 1010, y: GROUND_TOP, width: 14, height: 260, warnMs: 500, activeMs: 750, cooldownMs: 1100, offsetMs: 0 },
+
+        // Stage 4: Corruption zone
+        { kind: 'corruption_zone', x: 5020, y: GROUND_TOP, width: 160, warnMs: 550, activeMs: 1000, cooldownMs: 1200, offsetMs: 300 },
+
+        // Stage 5: Wake laser barrier
+        { kind: 'laser_gate', x: 6500, y: GROUND_TOP, width: 14, height: 260, warnMs: 500, activeMs: 750, cooldownMs: 1000, offsetMs: 500 },
       ],
       pickups: [
-        { x: 1200, y: 386, type: 'aegis_olympus' },
-        { x: 1540, y: 434, type: 'phoenix_core' },
+        // Stage 1: Causeway cache
+        { x: 710, y: 410, type: 'phoenix_core' },
+
+        // Stage 2: Sniper balcony relic
+        { x: 2400, y: 300, type: 'aegis_olympus' },
+
+        // Stage 3: High escape shelf
+        { x: 3650, y: 280, type: 'rune_of_ruin' },
+
+        // Stage 4: Sanctum ruin vault
+        { x: 5400, y: 350, type: 'thunderheart' },
+
+        // Stage 5: Wake spire cache
+        { x: 6850, y: 350, type: 'overdrive_shard' },
+
+        // Stage 6: Arena Central Vantage
+        { x: 7850, y: 280, type: 'phoenix_core' },
+      ],
+      enemies: [
+        // Stage 1: The Crown's Shadow
+        { kind: 'crown_stalker', x: 710, y: GROUND_TOP - 60, patrolMin: 620, patrolMax: 800 },
+        { kind: 'crown_sentinel', x: 1200, y: GROUND_TOP - 60, patrolMin: 1100, patrolMax: 1300 },
+
+        // Stage 2: The Harrowed Gate
+        { kind: 'dominion_marksman', x: 1680, y: 460, guardGroup: 'harrowed_guard' },
+        { kind: 'crown_sentinel', x: 2350, y: GROUND_TOP - 60, patrolMin: 2200, patrolMax: 2500, guardGroup: 'harrowed_guard' },
+        { kind: 'dominion_marksman', x: 2650, y: 250, guardGroup: 'harrowed_guard' },
+
+        // Stage 3: The Hunting Grounds
+        { kind: 'crown_stalker', x: 3100, y: GROUND_TOP - 60, patrolMin: 2950, patrolMax: 3250 },
+        { kind: 'crown_stalker', x: 3750, y: GROUND_TOP - 60, patrolMin: 3600, patrolMax: 3950 },
+        { kind: 'dominion_marksman', x: 3850, y: 450 },
+
+        // Stage 4: The Broken Sanctum
+        { kind: 'crown_sentinel', x: 4550, y: GROUND_TOP - 60, patrolMin: 4400, patrolMax: 4650 },
+        { kind: 'crown_stalker', x: 5250, y: GROUND_TOP - 60, patrolMin: 5050, patrolMax: 5450 },
+        { kind: 'dominion_marksman', x: 5400, y: 360 },
+
+        // Stage 5: The Red Wake
+        { kind: 'crown_stalker', x: 5900, y: GROUND_TOP - 60, patrolMin: 5750, patrolMax: 6050 },
+        { kind: 'crown_sentinel', x: 6550, y: GROUND_TOP - 60, patrolMin: 6400, patrolMax: 6700 },
+        { kind: 'dominion_marksman', x: 6850, y: 360 },
       ],
     },
     bossMechanics: {
@@ -831,8 +917,8 @@ export const LEVELS: Record<number, LevelConfig> = {
       hasHazards: true,
       hasBeams: true,
       canTeleport: true,
-      attackIntervalMin: 750,
-      attackIntervalMax: 1100,
+      attackIntervalMin: 700,
+      attackIntervalMax: 1050,
       projectileSpeedScale: 1.25,
     },
   },

@@ -1195,6 +1195,289 @@ function buildLevel4Materials(scene: Phaser.Scene) {
   });
 }
 
+/**
+ * Procedural materials for Level 5: THE OVERWRITE
+ * Palette: Black chrome, graphite, brushed titanium, pale ivory composite, electric amber.
+ */
+export function buildLevel5Materials(scene: Phaser.Scene) {
+  const W = 256;
+  const H = 80;
+  const solidBottom = 64;
+
+  // 1. Stage 1: platform_l5_chrome (Black chrome traversal slabs with subtle panel seams & amber status nodes)
+  forge(scene, 'platform_l5_chrome', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x181a20, 0x0a0c10, 20);
+    // Titanium panel dividers
+    for (let px = 32; px < W; px += 48) {
+      path(g, [{ x: px, y: 14 }, { x: px, y: solidBottom - 6 }], 0x374151, 0.85, 1.5);
+      g.fillStyle(0xf59e0b, 0.85);
+      g.fillCircle(px, 18, 2.5);
+    }
+    // Pale ivory composite top landing band
+    bandRect(g, 0, 0, W, 13, 0xf3f4f6, 0xd1d5db, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 1, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0xf59e0b, 0.9, 2);
+  });
+
+  // 2. Stage 2: platform_l5_machinery (Moving mechanical lifts and sliding structural slabs)
+  forge(scene, 'platform_l5_machinery', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x1f242d, 0x0f1116, 20);
+    // Guide rails and mechanical mounting grooves
+    path(g, [{ x: 12, y: 26 }, { x: W - 12, y: 26 }], 0x4b5563, 0.9, 3);
+    path(g, [{ x: 12, y: 46 }, { x: W - 12, y: 46 }], 0x374151, 0.8, 2);
+    for (let px = 24; px < W; px += 40) {
+      g.fillStyle(0xd1d5db, 0.9);
+      g.fillRect(px - 4, 22, 8, 12);
+      g.fillStyle(0xf59e0b, 0.9);
+      g.fillCircle(px, 46, 3);
+    }
+    // Top ivory grip band with amber seam
+    bandRect(g, 0, 0, W, 12, 0xe5e7eb, 0x9ca3af, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 0.95, 2);
+    path(g, [{ x: 0, y: 12 }, { x: W, y: 12 }], 0xd97706, 0.9, 2);
+  });
+
+  // 3. Stage 3: platform_l5_desync (Mismatched desync slabs with amber fault lines)
+  forge(scene, 'platform_l5_desync', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x1a1c23, 0x090a0d, 20);
+    // Diagonal amber fault lines
+    for (let px = 20; px < W; px += 48) {
+      path(g, [{ x: px, y: 14 }, { x: px + 16, y: 38 }, { x: px + 8, y: 56 }], 0xfbbf24, 0.9, 2);
+    }
+    bandRect(g, 0, 0, W, 13, 0xd1d5db, 0x4b5563, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0xf59e0b, 0.85, 2);
+  });
+
+  // 4. Stage 4: platform_l5_foundry (Heavy industrial compression deck with amber hazard lines)
+  forge(scene, 'platform_l5_foundry', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x15181f, 0x090a0d, 20);
+    // Industrial hazard stripes
+    for (let px = 10; px < W; px += 28) {
+      poly(g, [{ x: px, y: 14 }, { x: px + 12, y: 14 }, { x: px + 4, y: 36 }, { x: px - 8, y: 36 }], 0xd97706, 0.7);
+    }
+    bandRect(g, 0, 0, W, 13, 0x4b5563, 0x1f242d, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xf3f4f6, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0xf59e0b, 0.9, 2);
+  });
+
+  // 5. Stage 5: platform_l5_citadel (Layered firewall citadel wall and reinforced security barrier)
+  forge(scene, 'platform_l5_citadel', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x181d26, 0x0b0d12, 20);
+    // Reinforced ivory security plates
+    for (let px = 20; px < W; px += 44) {
+      g.fillStyle(0xf3f4f6, 0.85);
+      g.fillRect(px - 14, 18, 28, 32);
+      outline(g, [{ x: px - 14, y: 18 }, { x: px + 14, y: 18 }, { x: px + 14, y: 50 }, { x: px - 14, y: 50 }], 0x9ca3af, 0.9, 1.5);
+      g.fillStyle(0xf59e0b, 0.95);
+      g.fillCircle(px, 34, 3);
+    }
+    bandRect(g, 0, 0, W, 13, 0x374151, 0x181d26, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 1, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0xf59e0b, 0.95, 2);
+  });
+
+  // 6. Stage 6: platform_l5_core (Prime Protocol Engine arena floor)
+  forge(scene, 'platform_l5_core', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x12141a, 0x060709, 20);
+    // Amber circuit conduits
+    path(g, [{ x: 0, y: 32 }, { x: W, y: 32 }], 0xf59e0b, 0.9, 2.5);
+    for (let px = 32; px < W; px += 64) {
+      poly(g, [{ x: px - 12, y: 22 }, { x: px + 12, y: 22 }, { x: px, y: 44 }], 0xfbbf24, 0.85);
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(px, 32, 3);
+    }
+    bandRect(g, 0, 0, W, 14, 0xf3f4f6, 0xd1d5db, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 1, 2);
+    path(g, [{ x: 0, y: 14 }, { x: W, y: 14 }], 0xf59e0b, 0.95, 2.5);
+  });
+
+  // 7. Arena Wall for Protocol Warden
+  forge(scene, 'platform_l5_arena_wall', 48, 420, (g) => {
+    bandRect(g, 0, 0, 48, 420, 0x181a20, 0x090a0d, 20);
+    g.lineStyle(2, 0x4b5563, 0.9);
+    g.strokeRect(2, 2, 44, 416);
+    // Vertical amber energy bus
+    path(g, [{ x: 24, y: 8 }, { x: 24, y: 412 }], 0xf59e0b, 0.95, 2.5);
+  });
+
+  // 8. Protocol Node (Baseline State)
+  forge(scene, 'protocol_node_baseline', 44, 44, (g) => {
+    g.fillStyle(0x181a20, 0.95);
+    g.fillCircle(22, 22, 20);
+    g.lineStyle(2, 0xd1d5db, 0.9);
+    g.strokeCircle(22, 22, 18);
+    // Amber core
+    g.fillStyle(0xf59e0b, 0.95);
+    g.fillCircle(22, 22, 8);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(22, 22, 3);
+  });
+
+  // 9. Protocol Node (Overwritten State)
+  forge(scene, 'protocol_node_overwritten', 44, 44, (g) => {
+    g.fillStyle(0x0f1116, 0.95);
+    g.fillCircle(22, 22, 20);
+    g.lineStyle(2.5, 0xfbbf24, 1);
+    g.strokeCircle(22, 22, 18);
+    // Overclocked bright amber core with inner aura
+    g.fillStyle(0xd97706, 0.8);
+    g.fillCircle(22, 22, 13);
+    g.fillStyle(0xfbbf24, 1);
+    g.fillCircle(22, 22, 8);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(22, 22, 4);
+  });
+
+  // 10. Compression Press Hazard Plate
+  forge(scene, 'compression_press', 180, 140, (g) => {
+    bandRect(g, 0, 0, 180, 140, 0x1f242d, 0x0b0d12, 20);
+    // Industrial teeth and amber hazard striping
+    for (let px = 10; px < 180; px += 24) {
+      poly(g, [{ x: px, y: 100 }, { x: px + 12, y: 100 }, { x: px + 6, y: 136 }], 0xf59e0b, 0.9);
+    }
+    g.lineStyle(2, 0xd1d5db, 0.9);
+    g.strokeRect(2, 2, 176, 136);
+  });
+}
+
+/**
+ * Level 6: The Black Crown Dedicated Architectural Material Suite.
+ * Void black, blackened maroon, blood maroon, abyss navy, midnight steel blue,
+ * ashen metal, and pale ash highlights.
+ */
+function buildLevel6Materials(scene: Phaser.Scene) {
+  const W = 256;
+  const H = 80;
+  const solidBottom = 54;
+
+  // 1. Stage 1: platform_l6_black_metal (Heavy void black slabs with blackened maroon joints)
+  forge(scene, 'platform_l6_black_metal', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x07070a, 0x030305, 20);
+    // Blackened maroon structural brackets
+    for (let px = 24; px < W; px += 48) {
+      poly(g, [{ x: px - 16, y: 16 }, { x: px + 16, y: 16 }, { x: px + 10, y: 46 }, { x: px - 10, y: 46 }], 0x350812, 0.9);
+      g.fillStyle(0x77747a, 0.8);
+      g.fillRect(px - 3, 20, 6, 8);
+    }
+    // Pale ash landing lip with blood-maroon energy rim
+    bandRect(g, 0, 0, W, 12, 0xc5bdb4, 0x77747a, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 0.95, 2);
+    path(g, [{ x: 0, y: 12 }, { x: W, y: 12 }], 0x641329, 0.9, 2);
+  });
+
+  // 2. Stage 2: platform_l6_maroon_vein (Blackened metal with branching blood-maroon corruption veins)
+  forge(scene, 'platform_l6_maroon_vein', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x0d070b, 0x050204, 20);
+    // Dark blood-maroon corruption veins
+    for (let px = 16; px < W; px += 44) {
+      path(g, [{ x: px, y: 14 }, { x: px + 14, y: 32 }, { x: px + 4, y: 52 }], 0x641329, 0.85, 2.5);
+      path(g, [{ x: px + 14, y: 32 }, { x: px + 26, y: 46 }], 0x203858, 0.75, 1.5);
+    }
+    bandRect(g, 0, 0, W, 13, 0x350812, 0x07070a, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xc5bdb4, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0x641329, 0.95, 2);
+  });
+
+  // 3. Stage 3: platform_l6_abyss_steel (Abyss navy mechanical gantries with midnight blue fittings)
+  forge(scene, 'platform_l6_abyss_steel', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x071426, 0x030810, 20);
+    // Midnight steel-blue mechanical mountings
+    path(g, [{ x: 10, y: 24 }, { x: W - 10, y: 24 }], 0x203858, 0.9, 2.5);
+    path(g, [{ x: 10, y: 44 }, { x: W - 10, y: 44 }], 0x15253b, 0.8, 2);
+    for (let px = 20; px < W; px += 40) {
+      g.fillStyle(0x77747a, 0.85);
+      g.fillCircle(px, 24, 3);
+      g.fillStyle(0x641329, 0.9);
+      g.fillCircle(px, 44, 2.5);
+    }
+    bandRect(g, 0, 0, W, 13, 0x203858, 0x071426, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xc5bdb4, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0x203858, 0.9, 2);
+  });
+
+  // 4. Stage 4: platform_l6_sanctum (Broken sanctum ribs with deep maroon fissures)
+  forge(scene, 'platform_l6_sanctum', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x0a0407, 0x040203, 20);
+    // Broken rib structures
+    for (let px = 18; px < W; px += 36) {
+      poly(g, [{ x: px - 12, y: 16 }, { x: px + 12, y: 16 }, { x: px + 6, y: 48 }, { x: px - 6, y: 48 }], 0x350812, 0.85);
+      path(g, [{ x: px - 6, y: 20 }, { x: px + 6, y: 44 }], 0x641329, 0.9, 2);
+    }
+    bandRect(g, 0, 0, W, 13, 0x77747a, 0x350812, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 0.95, 2);
+    path(g, [{ x: 0, y: 13 }, { x: W, y: 13 }], 0x641329, 0.95, 2);
+  });
+
+  // 5. Stage 5: platform_l6_wake (Red wake combat slab with blood maroon hazard chevrons)
+  forge(scene, 'platform_l6_wake', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x0e0307, 0x060103, 20);
+    // Blood maroon combat chevrons
+    for (let px = 14; px < W; px += 32) {
+      poly(g, [{ x: px, y: 18 }, { x: px + 14, y: 18 }, { x: px + 6, y: 44 }, { x: px - 8, y: 44 }], 0x641329, 0.8);
+    }
+    bandRect(g, 0, 0, W, 14, 0x350812, 0x0e0307, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xc5bdb4, 1, 2);
+    path(g, [{ x: 0, y: 14 }, { x: W, y: 14 }], 0x641329, 0.95, 2.5);
+  });
+
+  // 6. Stage 6: platform_l6_throne (Monumental Black Crown Arena floor)
+  forge(scene, 'platform_l6_throne', W, H, (g) => {
+    bandRect(g, 0, 0, W, solidBottom, 0x07070a, 0x020204, 20);
+    // Midnight steel-blue & blood maroon power grid
+    path(g, [{ x: 0, y: 30 }, { x: W, y: 30 }], 0x203858, 0.9, 3);
+    for (let px = 32; px < W; px += 64) {
+      poly(g, [{ x: px - 14, y: 20 }, { x: px + 14, y: 20 }, { x: px, y: 44 }], 0x641329, 0.9);
+      g.fillStyle(0xc5bdb4, 1);
+      g.fillCircle(px, 30, 3);
+    }
+    bandRect(g, 0, 0, W, 14, 0xc5bdb4, 0x77747a, 8);
+    path(g, [{ x: 0, y: 1 }, { x: W, y: 1 }], 0xffffff, 1, 2);
+    path(g, [{ x: 0, y: 14 }, { x: W, y: 14 }], 0x641329, 0.95, 2.5);
+  });
+
+  // 7. Arena Wall for Ra-One's Black Crown Throne
+  forge(scene, 'platform_l6_arena_wall', 48, 440, (g) => {
+    bandRect(g, 0, 0, 48, 440, 0x07070a, 0x020204, 20);
+    g.lineStyle(2, 0x350812, 0.9);
+    g.strokeRect(2, 2, 44, 436);
+    // Central blood maroon & steel-blue energy column
+    path(g, [{ x: 24, y: 8 }, { x: 24, y: 432 }], 0x641329, 0.95, 3);
+    path(g, [{ x: 24, y: 8 }, { x: 24, y: 432 }], 0x203858, 0.6, 1.5);
+  });
+
+  // 8. Corruption Fissure Hazard Plate
+  forge(scene, 'hazard_corruption_fissure', 180, 32, (g) => {
+    bandRect(g, 0, 0, 180, 32, 0x07070a, 0x350812, 10);
+    // Fissure cracks
+    path(g, [{ x: 10, y: 16 }, { x: 45, y: 8 }, { x: 90, y: 22 }, { x: 135, y: 10 }, { x: 170, y: 16 }], 0x641329, 0.95, 3);
+    g.fillStyle(0x641329, 0.7);
+    g.fillCircle(90, 16, 6);
+  });
+
+  // 9. Crushing Barrier Gate
+  forge(scene, 'hazard_crushing_barrier', 60, 240, (g) => {
+    bandRect(g, 0, 0, 60, 240, 0x07070a, 0x030810, 20);
+    g.lineStyle(2, 0x203858, 0.9);
+    g.strokeRect(2, 2, 56, 236);
+    for (let py = 20; py < 240; py += 36) {
+      poly(g, [{ x: 10, y: py }, { x: 30, y: py + 12 }, { x: 50, y: py }], 0x641329, 0.85);
+    }
+  });
+
+  // 10. Protocol Break Indicator Sigil
+  forge(scene, 'protocol_break_indicator', 56, 56, (g) => {
+    // Outer spinning midnight steel-blue brackets
+    g.lineStyle(2.5, 0x203858, 0.95);
+    g.strokeCircle(28, 28, 24);
+    // Inner blood-maroon diamond
+    poly(g, [{ x: 28, y: 8 }, { x: 48, y: 28 }, { x: 28, y: 48 }, { x: 8, y: 28 }], 0x641329, 0.85);
+    // Glowing core
+    g.fillStyle(0xc5bdb4, 1);
+    g.fillCircle(28, 28, 5);
+  });
+}
+
 /* ---------------------------------------------------------------------------
    Entry point
    --------------------------------------------------------------------------- */
@@ -1212,5 +1495,7 @@ export function buildAllRealms(scene: Phaser.Scene) {
   buildLevel2Materials(scene);
   buildLevel3Materials(scene);
   buildLevel4Materials(scene);
+  buildLevel5Materials(scene);
+  buildLevel6Materials(scene);
 }
 

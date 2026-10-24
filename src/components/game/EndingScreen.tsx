@@ -39,39 +39,23 @@ export const EndingScreen: React.FC<EndingScreenProps> = ({
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center p-6 select-none overflow-hidden animate-fade-in">
-      {/* Backdrop art — legible, not washed out */}
+      {/* Backdrop art — crisp 100% clarity, anchored at top so Ra-One's head/horns are never cropped */}
       <img
         src={image}
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover object-center opacity-60 animate-slow-push"
-      />
-      <div
-        className={`absolute inset-0 ${
-          isVictory
-            ? 'bg-gradient-to-b from-obsidian/85 via-order-deep/55 to-obsidian/95'
-            : 'bg-gradient-to-b from-obsidian/90 via-entropy-dark/60 to-obsidian/96'
-        }`}
+        className="absolute inset-0 w-full h-full object-cover object-[center_top]"
       />
 
-      {/* The seam: stabilised on victory, bleeding on defeat */}
-      <div
-        className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px pointer-events-none"
-        aria-hidden="true"
-        style={{
-          background: isVictory
-            ? 'linear-gradient(to bottom, transparent, rgba(0,207,255,0.85), transparent)'
-            : 'linear-gradient(to bottom, transparent, rgba(255,36,61,0.75), transparent)',
-          boxShadow: isVictory
-            ? '0 0 30px 6px rgba(0,207,255,0.45)'
-            : '0 0 30px 6px rgba(255,36,61,0.4)',
-        }}
-      />
+      {/* Subtle edge-only vignette: preserves the pristine clarity of the artwork without foggy overlays */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(5,8,17,0.35)_100%)] pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-obsidian/75 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-obsidian/50 to-transparent pointer-events-none" />
 
       <div
         className={`panel ${
           isVictory ? 'panel-order' : 'panel-entropy'
-        } relative z-10 max-w-xl w-full p-8 flex flex-col items-center text-center gap-5 animate-rise-in`}
+        } relative z-10 max-w-lg w-full p-6 sm:p-8 flex flex-col items-center text-center gap-4 sm:gap-5 animate-rise-in bg-obsidian/85 backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.9)]`}
       >
         <SeamSigil size={26} />
 
