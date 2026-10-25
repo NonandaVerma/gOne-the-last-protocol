@@ -85,6 +85,9 @@ export class PreloadScene extends Phaser.Scene {
 
     // Defeat background
     this.load.image('bg_defeat', '/images/defeat.png');
+
+    // Common realm transition background
+    this.load.image('bg_gameplay', '/images/gameplay.png');
   }
 
   create() {

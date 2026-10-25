@@ -174,6 +174,16 @@ export const REALM_REVEALS: Record<number, RealmRevealConfig> = {
       { from: 0.82, to: 0.96, text: 'Harmonize the rootlines. Restore the living light. Enter Realm III — THE VERDANT ABYSS.' },
     ],
   },
+  4: {
+    video: '/images/gOne-level4.mp4',
+    cues: [
+      { from: 0.04, to: 0.18, text: 'The ancient roots dissolve into cosmic dust. Space and time begin to warp.' },
+      { from: 0.22, to: 0.38, text: 'Beyond the canopy lies a realm of inverted mass and fractured space — The Voidborn Abyss.' },
+      { from: 0.42, to: 0.58, text: 'Obsidian spires and violet gravitational anomalies pulse with dimensional energy.' },
+      { from: 0.62, to: 0.78, text: 'At the event horizon of the Singularity, The Void Sovereign commands the dark.' },
+      { from: 0.82, to: 0.96, text: 'Master inverted gravity. Shatter the rifts. Enter Realm IV — THE VOIDBORN ABYSS.' },
+    ],
+  },
 };
 
 export function getRealmReveal(level: number): RealmRevealConfig | undefined {

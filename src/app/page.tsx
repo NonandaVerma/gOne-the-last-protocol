@@ -14,6 +14,7 @@ import { TouchControls } from '../components/game/TouchControls';
 import { StageBanner } from '../components/game/StageBanner';
 import { IntroCinematic } from '../components/game/IntroCinematic';
 import { LevelRevealCinematic, getRealmReveal } from '../components/game/LevelRevealCinematic';
+import { LevelTransitionScreen } from '../components/game/LevelTransitionScreen';
 import { SaveManager } from '../game/systems/SaveManager';
 
 /** Session-scoped: the cinematic replays on a fresh browser session only. */
@@ -43,6 +44,11 @@ export default function Home() {
    */
   const [showIntro, setShowIntro] = useState(false);
   const [revealLevel, setRevealLevel] = useState<number | null>(null);
+  const [transitionData, setTransitionData] = useState<{
+    currentLevel: number;
+    nextLevel: number;
+    storyLines: string[];
+  } | null>(null);
 
   useEffect(() => {
     try {
@@ -56,6 +62,20 @@ export default function Home() {
       if (params.get('state') === 'defeat' || params.get('defeat') === 'true') {
         setShowIntro(false);
         setGameState('DEFEAT');
+        return;
+      }
+      if (params.get('state') === 'transition' || params.get('transition') === 'true') {
+        setShowIntro(false);
+        setTransitionData({
+          currentLevel: 1,
+          nextLevel: 2,
+          storyLines: [
+            'THE SKY-FORTRESS HAS FALLEN BEHIND YOU.',
+            'CONSECRATED IRON AND VOLCANIC STONE ENGULF THE REALM.',
+            'SIX SECTORS OF CORRUPTION BAR YOUR PATH TO THE WARDEN.',
+          ],
+        });
+        setGameState('LEVEL_TRANSITION');
         return;
       }
       if (params.get('autoplay') === 'true' || params.get('skipIntro') === 'true') {
@@ -79,12 +99,23 @@ export default function Home() {
       }
     };
 
+    const handleLevelTransition = (data: {
+      currentLevel: number;
+      nextLevel: number;
+      storyLines: string[];
+    }) => {
+      setTransitionData(data);
+      setGameState('LEVEL_TRANSITION');
+    };
+
     EventBus.on(GAME_EVENTS.GAME_STATE_CHANGED, handleStateChange);
     EventBus.on('play-realm-reveal', handlePlayReveal);
+    EventBus.on('level-transition-start', handleLevelTransition);
 
     return () => {
       EventBus.off(GAME_EVENTS.GAME_STATE_CHANGED, handleStateChange);
       EventBus.off('play-realm-reveal', handlePlayReveal);
+      EventBus.off('level-transition-start', handleLevelTransition);
     };
   }, []);
 
@@ -94,6 +125,18 @@ export default function Home() {
     if (nextLvl) {
       SaveManager.markRevealSeen(nextLvl);
       EventBus.emit('realm-reveal-finished', { level: nextLvl });
+    }
+  };
+
+  const handleProceedTransition = () => {
+    if (!transitionData) return;
+    const { nextLevel } = transitionData;
+    setTransitionData(null);
+    EventBus.emit('proceed-level-transition', { nextLevel });
+    if (getRealmReveal(nextLevel)) {
+      setRevealLevel(nextLevel);
+    } else {
+      EventBus.emit(GAME_EVENTS.START_GAME, { level: nextLevel });
     }
   };
 
@@ -114,9 +157,6 @@ export default function Home() {
     <main className="relative w-screen h-screen overflow-hidden bg-obsidian flex items-center justify-center">
       {/* 1. Underlying Phaser Canvas */}
       <GameCanvas />
-
-      {/* 2. CRT Scanline Shader Filter for Sci-Fi Retro Atmosphere */}
-      <div className="scanlines absolute inset-0 pointer-events-none z-10" />
 
       {/* 3. React UI State Layers */}
       {gameState === 'MAIN_MENU' && (
@@ -144,6 +184,15 @@ export default function Home() {
 
       {gameState === 'VICTORY' && (
         <VictoryScreen />
+      )}
+
+      {gameState === 'LEVEL_TRANSITION' && transitionData && (
+        <LevelTransitionScreen
+          currentLevel={transitionData.currentLevel}
+          nextLevel={transitionData.nextLevel}
+          storyLines={transitionData.storyLines}
+          onProceed={handleProceedTransition}
+        />
       )}
 
       {/* Settings Modal (available from MainMenu or PauseMenu) */}

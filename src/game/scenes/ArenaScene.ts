@@ -1181,9 +1181,15 @@ export class ArenaScene extends Phaser.Scene {
 
   private showLevelTransition(nextLevel: number, storyLines: string[]) {
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'LEVEL_TRANSITION');
+    EventBus.emit('level-transition-start', {
+      currentLevel: this.currentLevel,
+      nextLevel,
+      storyLines,
+    });
 
-    const stageArtKey = this.currentLevel === 1
-      ? 'bg_realm1_stage5'
+    // Use shared gameplay.png transition artwork across all realms
+    const stageArtKey = this.textures.exists('bg_gameplay')
+      ? 'bg_gameplay'
       : (this.textures.exists(`bg_realm${nextLevel}`) ? `bg_realm${nextLevel}` : `bg_realm${this.currentLevel}`);
     const hasStageArt = this.textures.exists(stageArtKey);
     const fadeTargets: Phaser.GameObjects.GameObject[] = [];
@@ -1200,12 +1206,10 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     const overlay = this.add.graphics().setScrollFactor(0).setDepth(80).setAlpha(0);
-    // Let the reward art read as a place, not just a wash behind text.
-    overlay.fillStyle(0x070a0f, hasStageArt ? 0.6 : 0.94);
+    // Darkening overlay so text is crisp and readable over the gameplay backdrop
+    overlay.fillStyle(0x050811, 0.65);
     overlay.fillRect(0, 0, VIEW_W, VIEW_H);
 
-    // The dimensional seam as the transition device: a vertical fracture that
-    // expands across the screen before the next realm is revealed.
     const seam = this.add
       .rectangle(VIEW_W / 2, VIEW_H / 2, 4, VIEW_H, 0xffffff, 0.9)
       .setScrollFactor(0)
@@ -1213,14 +1217,55 @@ export class ArenaScene extends Phaser.Scene {
       .setBlendMode(Phaser.BlendModes.ADD)
       .setAlpha(0);
 
-    const nextName = LEVELS[nextLevel]?.name ?? '';
+    const nextName = LEVELS[nextLevel]?.name ?? 'NEXT REALM';
+
+    // 1. REALM CLEARED
+    const header = this.add
+      .text(VIEW_W / 2, 135, `REALM ${this.currentLevel} CLEARED`, {
+        fontFamily: 'Orbitron, sans-serif',
+        fontSize: '32px',
+        color: '#00F0FF',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(81)
+      .setAlpha(0);
+
+    // 2. PROTOCOL FRAGMENT ACQUIRED
+    const fragmentBadge = this.add
+      .text(VIEW_W / 2, 180, 'PROTOCOL FRAGMENT ACQUIRED', {
+        fontFamily: 'Rajdhani, sans-serif',
+        fontSize: '20px',
+        color: '#FFD700',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(81)
+      .setAlpha(0);
+
+    // 3. Narrative Briefing / Story Lines
     const txt = this.add
-      .text(VIEW_W / 2, VIEW_H / 2 - 50, storyLines.join('\n\n'), {
+      .text(VIEW_W / 2, 310, storyLines.join('\n\n'), {
         fontFamily: 'Rajdhani, sans-serif',
         fontSize: '22px',
-        color: '#9BAAB7',
+        color: '#C8D6E5',
         align: 'center',
-        lineSpacing: 14,
+        lineSpacing: 10,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(81)
+      .setAlpha(0);
+
+    // 4. NEXT DESTINATION
+    const destLabel = this.add
+      .text(VIEW_W / 2, 445, 'NEXT DESTINATION', {
+        fontFamily: 'Rajdhani, sans-serif',
+        fontSize: '16px',
+        color: '#8395A5',
+        fontStyle: 'bold',
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -1228,10 +1273,10 @@ export class ArenaScene extends Phaser.Scene {
       .setAlpha(0);
 
     const title = this.add
-      .text(VIEW_W / 2, VIEW_H / 2 + 80, nextName, {
+      .text(VIEW_W / 2, 490, nextName, {
         fontFamily: 'Orbitron, sans-serif',
-        fontSize: '30px',
-        color: '#00CFFF',
+        fontSize: '34px',
+        color: '#FFFFFF',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
@@ -1239,17 +1284,12 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(82)
       .setAlpha(0);
 
-    // Realm 1's exit is the Protocol Fragment beat: a real interactive pickup
-    // rather than a click-anywhere dismissal.
-    const isFragmentBeat = hasStageArt && this.currentLevel === 1 && !this.fragmentAbsorbed;
-
+    // 5. PRESS SPACE TO CONTINUE
     const prompt = this.add
       .text(
         VIEW_W / 2,
-        VIEW_H / 2 + 150,
-        isFragmentBeat
-          ? '[ CLICK FRAGMENT, PRESS E, OR PRESS SPACE / ENTER TO ENTER REALM II ]'
-          : `[ PRESS SPACE / ENTER OR CLICK TO ENTER ${nextName || 'NEXT REALM'} ]`,
+        600,
+        '[ PRESS SPACE / ENTER OR CLICK TO CONTINUE ]',
         {
           fontFamily: 'Rajdhani, sans-serif',
           fontSize: '18px',
@@ -1261,30 +1301,7 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(82)
       .setAlpha(0);
 
-    let fragment: Phaser.GameObjects.Arc | undefined;
-    if (isFragmentBeat) {
-      fragment = this.add
-        .circle(VIEW_W / 2, VIEW_H / 2 - 150, 16, HERO.energy, 0.9)
-        .setScrollFactor(0)
-        .setDepth(82)
-        .setAlpha(0)
-        .setStrokeStyle(2, 0xffffff, 0.8);
-      fadeTargets.push(fragment);
-      this.tweens.add({
-        targets: fragment,
-        scale: { from: 0.85, to: 1.15 },
-        yoyo: true,
-        repeat: -1,
-        duration: 700,
-        ease: 'Sine.easeInOut',
-      });
-    }
-
-    // The seam is deliberately excluded here: it stays invisible while the
-    // player reads the card and only appears as the expanding wipe on
-    // proceed(). Fading it in here was the bug — a static full-opacity line
-    // sitting through the whole card, not the intended transition effect.
-    this.tweens.add({ targets: [overlay, txt, title, prompt, ...fadeTargets], alpha: 1, duration: 500 });
+    this.tweens.add({ targets: [overlay, header, fragmentBadge, txt, destLabel, title, prompt, ...fadeTargets], alpha: 1, duration: 500 });
     this.tweens.add({
       targets: prompt,
       alpha: { from: 0.4, to: 1 },
@@ -1308,23 +1325,14 @@ export class ArenaScene extends Phaser.Scene {
 
       try { this.powerUps?.clearAll(); } catch (_) {}
 
-      if (isFragmentBeat && fragment) {
-        // Absorption: the fragment collapses into a burst rather than just
-        // vanishing — the one real reward feedback this beat has to give.
-        this.juice?.impact(fragment.x, fragment.y, 'player', { scale: 1.6, sparks: 20, ring: true });
-        AudioManager.getInstance().playRelicCollect();
-        this.tweens.add({ targets: fragment, scale: 0, alpha: 0, duration: 220 });
-      }
+      AudioManager.getInstance().playRelicCollect();
 
-      // Seam appears only now, expanding to fill the screen before the next
-      // realm loads behind it — the actual transition wipe, not a static line.
       seam.setAlpha(1);
       this.tweens.add({
         targets: seam,
         scaleX: 400,
         duration: 420,
         ease: 'Quad.easeIn',
-        delay: isFragmentBeat ? 260 : 0,
         onComplete: () => {
           if (getRealmReveal(nextLevel)) {
             AudioManager.getInstance().stopMusic();
@@ -1341,34 +1349,12 @@ export class ArenaScene extends Phaser.Scene {
       });
     };
 
+    const onProceedEvent = () => proceed();
+    EventBus.once('proceed-level-transition', onProceedEvent);
+    cleanupFns.push(() => EventBus.off('proceed-level-transition', onProceedEvent));
+
     // Brief debounce so a combat click does not skip the card instantly.
     this.time.delayedCall(250, () => {
-      // The fragment is the advertised interaction (click it, or press E),
-      // but it is NEVER the only way through — every other transition in
-      // the game accepts click-anywhere/Space as a safety net, and this one
-      // previously didn't. A required precise interaction with zero
-      // fallback is exactly the kind of softlock risk this project
-      // otherwise guards against everywhere else; fixed by always also
-      // wiring the generic fallback below, regardless of isFragmentBeat.
-      if (isFragmentBeat && fragment) {
-        fragment.setInteractive({ useHandCursor: true });
-        fragment.on('pointerdown', proceed);
-        cleanupFns.push(() => {
-          try {
-            fragment?.off('pointerdown', proceed);
-          } catch (_) {}
-        });
-
-        const onFragmentKey = (e: KeyboardEvent) => {
-          if (e.code === 'KeyE' || e.key === 'e' || e.key === 'E') {
-            e.preventDefault();
-            proceed();
-          }
-        };
-        window.addEventListener('keydown', onFragmentKey, { capture: true });
-        cleanupFns.push(() => window.removeEventListener('keydown', onFragmentKey, { capture: true }));
-      }
-
       prompt.setInteractive({ useHandCursor: true });
       overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, VIEW_W, VIEW_H), Phaser.Geom.Rectangle.Contains);
 
@@ -1385,7 +1371,7 @@ export class ArenaScene extends Phaser.Scene {
       });
 
       const onWindowKey = (e: KeyboardEvent) => {
-        if (e.code === 'Space' || e.code === 'Enter' || e.key === ' ' || e.key === 'Enter') {
+        if (e.code === 'Space' || e.code === 'Enter' || e.key === ' ' || e.key === 'Enter' || e.code === 'KeyE' || e.key === 'e') {
           e.preventDefault();
           proceed();
         }
