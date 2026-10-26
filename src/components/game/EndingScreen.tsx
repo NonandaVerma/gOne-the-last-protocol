@@ -16,8 +16,8 @@ export interface EndingCopy {
 interface EndingScreenProps {
   outcome: 'victory' | 'defeat';
   copy: EndingCopy;
-  /** Background art path under /public. */
-  image: string;
+  /** Background art path under /public. Omit to let the Phaser scene's own backdrop show through. */
+  image?: string;
   /** Label for the primary action — "Play Again" vs "Retry". */
   primaryLabel: string;
 }
@@ -39,13 +39,18 @@ export const EndingScreen: React.FC<EndingScreenProps> = ({
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden animate-fade-in bg-[#050811]">
-      {/* 1. Full-viewport cinematic background — 100% edge-to-edge coverage */}
-      <img
-        src={image}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover object-[center_15%] z-0 select-none pointer-events-none"
-      />
+      {/* 1. Full-viewport cinematic background — 100% edge-to-edge coverage.
+             Omitted outcomes fall through to the underlying Phaser scene's own
+             backdrop (e.g. VictoryScene's re-lighting city) instead of a
+             broken <img> request. */}
+      {image && (
+        <img
+          src={image}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover object-[center_15%] z-0 select-none pointer-events-none"
+        />
+      )}
 
       {/* 2. Atmospheric vignettes — preserves open, crisp clarity in center where characters stand */}
       <div className="absolute inset-x-0 top-0 h-44 sm:h-52 bg-gradient-to-b from-black/85 via-black/40 to-transparent pointer-events-none z-10" />

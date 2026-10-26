@@ -66,7 +66,7 @@ export const LevelTransitionScreen: React.FC<LevelTransitionScreenProps> = ({
     >
       {/* 1. Full-viewport cinematic background — 100% edge-to-edge coverage */}
       <img
-        src="/images/gameplay.png"
+        src="/images/gameplay.webp"
         alt=""
         aria-hidden="true"
         className="absolute inset-0 w-full h-full object-cover object-[center_15%] z-0 select-none pointer-events-none"

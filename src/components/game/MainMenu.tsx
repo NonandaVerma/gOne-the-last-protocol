@@ -171,7 +171,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
           ================================================================== */}
       <div className="absolute inset-0 overflow-hidden">
         <img
-          src="/images/landing-bg.png"
+          src="/images/landing-bg.webp"
           alt=""
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover object-[center_top] will-change-transform"

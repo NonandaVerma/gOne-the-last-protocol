@@ -8,7 +8,6 @@ export const VictoryScreen: React.FC = () => (
   <EndingScreen
     outcome="victory"
     copy={VICTORY_STORY}
-    image="/images/bg_victory.png"
     primaryLabel="Play Again"
   />
 );

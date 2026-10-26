@@ -8,7 +8,7 @@ export const GameOverScreen: React.FC = () => (
   <EndingScreen
     outcome="defeat"
     copy={DEFEAT_STORY}
-    image="/images/defeat.png"
+    image="/images/defeat.webp"
     primaryLabel="Retry Realm"
   />
 );
