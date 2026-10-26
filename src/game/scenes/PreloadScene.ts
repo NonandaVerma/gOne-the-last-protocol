@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { ProceduralTextureFactory } from '../systems/ProceduralTextureFactory';
 import { EventBus, GAME_EVENTS } from '../systems/EventBus';
+import { Analytics } from '../systems/Analytics';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -96,6 +97,9 @@ export class PreloadScene extends Phaser.Scene {
 
     // Notify React layer that engine is ready
     EventBus.emit(GAME_EVENTS.SCENE_READY, 'PreloadScene');
+    // Phaser + all procedural textures initialised successfully — this is
+    // the "engine actually works" signal, distinct from a bare page view.
+    Analytics.gameLoaded();
 
     // Proceed to Main Menu Scene
     this.scene.start('MainMenuScene');

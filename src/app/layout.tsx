@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Orbitron, Rajdhani, Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 /**
@@ -63,6 +64,7 @@ export default function RootLayout({
         className="bg-obsidian text-paper antialiased overflow-hidden min-h-screen font-body select-none"
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );

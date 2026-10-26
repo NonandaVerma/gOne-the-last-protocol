@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUp, Flame, Shield, Wind, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, Flame, Shield, Sparkles, Wind, Zap } from 'lucide-react';
 import { EventBus, GAME_EVENTS } from '../../game/systems/EventBus';
 
 /**
@@ -108,6 +108,14 @@ export const TouchControls: React.FC = () => {
             onPress={() => EventBus.emit(GAME_EVENTS.TRIGGER_DASH)}
           >
             <Wind className="w-5 h-5" />
+          </Pad>
+
+          <Pad
+            label="Arc burst"
+            size="w-12 h-12"
+            onPress={() => EventBus.emit(GAME_EVENTS.TRIGGER_ARC)}
+          >
+            <Sparkles className="w-5 h-5" />
           </Pad>
         </div>
 

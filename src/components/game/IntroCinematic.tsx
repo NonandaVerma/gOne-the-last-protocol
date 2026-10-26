@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { Analytics } from '../../game/systems/Analytics';
 
 interface IntroCinematicProps {
   /** Called exactly once, on skip, natural end, or unrecoverable error. */
@@ -48,10 +49,16 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
   /** Guards against double-firing from overlapping skip inputs. */
   const finishedRef = useRef(false);
 
+  useEffect(() => {
+    Analytics.cinematicStarted('intro');
+  }, []);
+
   /** Stop playback, release the stream, then hand control to the landing page. */
-  const finish = useCallback(() => {
+  const finish = useCallback((skipped: boolean) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    if (skipped) Analytics.cinematicSkipped('intro');
+    else Analytics.cinematicCompleted('intro');
 
     const v = videoRef.current;
     if (v) {
@@ -102,7 +109,7 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
       if (phase === 'needs-gesture') return;
       e.preventDefault();
       e.stopPropagation();
-      finish();
+      finish(true);
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
@@ -143,7 +150,7 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
   return (
     <div
       className="fixed inset-0 z-[60] bg-obsidian flex items-center justify-center overflow-hidden"
-      onClick={phase === 'playing' ? finish : undefined}
+      onClick={phase === 'playing' ? () => finish(true) : undefined}
       role="dialog"
       aria-label="Opening cinematic"
     >
@@ -156,7 +163,7 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
         className="absolute inset-0 w-full h-full object-cover bg-obsidian"
         playsInline
         preload="auto"
-        onEnded={finish}
+        onEnded={() => finish(false)}
         onTimeUpdate={onTimeUpdate}
         onError={() => setPhase('error')}
       />
@@ -203,7 +210,7 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              finish();
+              finish(true);
             }}
             className="focus-protocol flex items-center gap-2 px-3.5 py-2 border border-order-cyan/40 bg-black/50 text-order-ice hover:bg-black/75 hover:border-order-cyan transition-colors font-ui text-[0.68rem] font-semibold uppercase tracking-[0.2em]"
           >
@@ -228,7 +235,7 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
             Play Cinematic — Sound On
           </button>
           <button
-            onClick={finish}
+            onClick={() => finish(true)}
             className="focus-protocol font-ui text-[0.68rem] uppercase tracking-[0.2em] text-muted hover:text-paper transition-colors"
           >
             Skip to menu
@@ -243,7 +250,7 @@ export const IntroCinematic: React.FC<IntroCinematicProps> = ({ onFinish }) => {
             Cinematic unavailable
           </p>
           <button
-            onClick={finish}
+            onClick={() => finish(true)}
             autoFocus
             className="focus-protocol px-8 py-4 border border-order-cyan bg-graphite text-white hover:bg-order-ice hover:text-obsidian transition-colors duration-200 font-display font-bold text-sm tracking-[0.2em] uppercase"
           >

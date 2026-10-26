@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { Analytics } from '../../game/systems/Analytics';
 
 import {
   REALM_REVEALS,
@@ -36,9 +37,11 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
   const [isFadingOut, setIsFadingOut] = useState(false);
   const finishedRef = useRef(false);
 
-  const finish = useCallback(() => {
+  const finish = useCallback((skipped: boolean) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    if (skipped) Analytics.cinematicSkipped(`reveal-${level}`);
+    else Analytics.cinematicCompleted(`reveal-${level}`);
     setIsFadingOut(true);
 
     // Give 420ms for smooth cinematic fade-to-black before unmounting
@@ -53,7 +56,11 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
       }
       onFinish();
     }, 420);
-  }, [onFinish]);
+  }, [onFinish, level]);
+
+  useEffect(() => {
+    if (reveal) Analytics.cinematicStarted(`reveal-${level}`);
+  }, [reveal, level]);
 
   // No footage configured for this realm — resolve immediately. Declared as
   // a normal effect (not inside a conditional) so hook order stays stable.
@@ -98,7 +105,7 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
       if (phase === 'needs-gesture') return;
       e.preventDefault();
       e.stopPropagation();
-      finish();
+      finish(true);
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
@@ -148,7 +155,7 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
   return (
     <div
       className="fixed inset-0 z-[60] bg-obsidian flex items-center justify-center overflow-hidden"
-      onClick={phase === 'playing' ? finish : undefined}
+      onClick={phase === 'playing' ? () => finish(true) : undefined}
       role="dialog"
       aria-label={`Realm ${level} reveal`}
     >
@@ -158,7 +165,7 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
         className="absolute inset-0 w-full h-full object-cover bg-obsidian"
         playsInline
         preload="auto"
-        onEnded={finish}
+        onEnded={() => finish(false)}
         onTimeUpdate={onTimeUpdate}
         onError={() => setPhase('error')}
       />
@@ -199,7 +206,7 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
           <button
             onClick={(e) => {
               e.stopPropagation();
-              finish();
+              finish(true);
             }}
             className="focus-protocol flex items-center gap-2 px-3.5 py-2 border border-order-cyan/40 bg-black/50 text-order-ice hover:bg-black/75 hover:border-order-cyan transition-colors font-ui text-[0.68rem] font-semibold uppercase tracking-[0.2em]"
           >
@@ -223,7 +230,7 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
             Play — Sound On
           </button>
           <button
-            onClick={finish}
+            onClick={() => finish(true)}
             className="focus-protocol font-ui text-[0.68rem] uppercase tracking-[0.2em] text-muted hover:text-paper transition-colors"
           >
             Skip to gameplay
@@ -237,7 +244,7 @@ export const LevelRevealCinematic: React.FC<LevelRevealCinematicProps> = ({ leve
             Cinematic unavailable
           </p>
           <button
-            onClick={finish}
+            onClick={() => finish(true)}
             autoFocus
             className="focus-protocol px-8 py-4 border border-order-cyan bg-graphite text-white hover:bg-order-ice hover:text-obsidian transition-colors duration-200 font-display font-bold text-sm tracking-[0.2em] uppercase"
           >

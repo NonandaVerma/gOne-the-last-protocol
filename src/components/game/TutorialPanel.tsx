@@ -6,9 +6,10 @@ import { EventBus, GAME_EVENTS } from '../../game/systems/EventBus';
 
 export interface TutorialPayload {
   title: string;
-  prompt: string;
+  /** Matches the `{ title, instruction, timeout }` shape ArenaScene actually emits. */
+  instruction: string;
   binding?: string;
-  duration?: number;
+  timeout?: number;
 }
 
 /**
@@ -34,7 +35,7 @@ export const TutorialPanel: React.FC = () => {
       setTutorial(data);
       setVisible(true);
 
-      const duration = data.duration ?? 4500;
+      const duration = data.timeout ?? 4500;
       timerRef.current = setTimeout(() => {
         setVisible(false);
       }, duration);
@@ -108,7 +109,7 @@ export const TutorialPanel: React.FC = () => {
             )}
           </div>
           <p className="font-ui text-[0.68rem] text-paper/90 leading-tight pt-0.5">
-            {tutorial.prompt}
+            {tutorial.instruction}
           </p>
         </div>
       )}

@@ -14,6 +14,7 @@ import {
 import { EventBus, GAME_EVENTS } from '../../game/systems/EventBus';
 import { AudioManager } from '../../game/systems/AudioManager';
 import { SaveManager } from '../../game/systems/SaveManager';
+import { Analytics } from '../../game/systems/Analytics';
 import { LEVELS } from '../../game/data/levels';
 import { ProtocolButton } from '../ui/ProtocolButton';
 import { ModalShell } from '../ui/ModalShell';
@@ -77,6 +78,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onOpenSettings }) => {
   const initiate = useCallback((level = 1, showCinematic = false) => {
     if (startedRef.current) return;
     startedRef.current = true;
+    Analytics.gameStartClicked(level);
 
     // Safety timeout: release lock after 2.5s so button never gets permanently stuck
     window.setTimeout(() => {

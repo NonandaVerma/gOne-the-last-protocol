@@ -26,6 +26,7 @@ import { GravitasManager } from '../systems/GravitasManager';
 import { ProtocolOverrideManager } from '../systems/ProtocolOverrideManager';
 import { ProtocolBreakManager } from '../systems/ProtocolBreakManager';
 import { LevelState } from '../systems/LevelState';
+import { Analytics } from '../systems/Analytics';
 
 /**
  * A realm: a traversal approach followed by a boss arena.
@@ -141,6 +142,8 @@ export class ArenaScene extends Phaser.Scene {
   create() {
     const config: LevelConfig = LEVELS[this.currentLevel] || LEVELS[1];
     const arena = config.arena;
+    Analytics.levelStarted(this.currentLevel);
+    Analytics.gameplayStarted();
     this.groundTop = arena.groundTop;
     this.worldWidth = arena.worldWidth;
     this.gaps = arena.gaps ?? [];
@@ -1084,6 +1087,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private handleBossDefeated() {
     this.clearCombatObjects();
+    Analytics.levelCompleted(this.currentLevel);
 
     const next = this.currentLevel + 1;
     SaveManager.saveUnlockedLevel(next);
@@ -1314,6 +1318,20 @@ export class ArenaScene extends Phaser.Scene {
     let hasProceeded = false;
     const cleanupFns: Array<() => void> = [];
 
+    // Guards against the window-level keydown/pointerdown listeners below
+    // outliving this scene instance. Without this, quitting to the menu,
+    // restarting the story, or restarting the level while this prompt is on
+    // screen leaves those listeners attached to `window`; the next Space
+    // press or click anywhere on the page then re-fires `proceed()` against
+    // a dead scene, silently restarting a stale ArenaScene underneath
+    // whatever the player is actually doing.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      cleanupFns.forEach((fn) => {
+        try { fn(); } catch (_) {}
+      });
+      cleanupFns.length = 0;
+    });
+
     const proceed = () => {
       if (hasProceeded) return;
       hasProceeded = true;
@@ -1387,6 +1405,7 @@ export class ArenaScene extends Phaser.Scene {
 
   private handlePlayerDefeated() {
     this.clearCombatObjects();
+    Analytics.playerDefeated(this.currentLevel);
     EventBus.emit(GAME_EVENTS.GAME_STATE_CHANGED, 'DEFEAT');
     this.time.delayedCall(900, () => {
       try { this.powerUps?.clearAll(); } catch (_) {}
@@ -1442,7 +1461,11 @@ export class ArenaScene extends Phaser.Scene {
 
     p.setPosition(respawnX, respawnY - 40);
     this.juice?.shake(0.012, 220);
-    p.takeDamage(1);
+    // Falling is an environmental hazard, not a blockable attack — Aegis
+    // Shield previously voided pit damage entirely (the shield check in
+    // takeDamage() is meant for projectiles), letting a raised shield turn
+    // every pitfall into a free respawn with no health cost.
+    p.takeDamage(1, undefined, true);
     this.protocolOverrideManager?.resetToCheckpoint();
   }
 
@@ -1621,12 +1644,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE I OBJECTIVE',
             value: 'RESTORE POWER RELAY [E]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 1: Awakening — Auxiliary power offline. Access the Power Relay console to override the security blast door.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 1: AWAKENING',
             instruction: 'Move with [A]/[D], Jump with [W]/[Space]. Approach the Power Relay console at x:720 and press [E] to restore power.',
@@ -1638,12 +1655,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE II OBJECTIVE',
             value: 'DEFLECT SENTINEL VOLLEYS',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 2: Sky Sentinels — Aerial patrol detected. Deploy Aegis Shield to deflect incoming plasma barrages.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 2: SKY SENTINELS',
             instruction: 'Step on Launch Pads to scale vertical catwalks. Press [K] or Right-Click to raise Aegis Shield and reflect laser volleys.',
@@ -1654,12 +1665,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE III OBJECTIVE',
             value: 'CROSS COLLAPSING BRIDGE',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 3: The Shattered Bridge — The structure is crumbling over the abyss. Traverse quickly before platforms collapse.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 3: THE SHATTERED BRIDGE',
@@ -1673,12 +1678,6 @@ export class ArenaScene extends Phaser.Scene {
             value: 'DEFEAT RA-ONE',
             alert: true,
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 4: The Corrupted Guardian — Ra-One has compromised the primary defense core. Beware his kinetic plating!',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 4: THE CORRUPTED GUARDIAN',
             instruction: 'Ra-One deflects basic Pulse fire during windup. Evade his telegraphed strikes, then counter-attack during his 1.4s exposed cooling phase.',
@@ -1689,12 +1688,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE V OBJECTIVE',
             value: 'ABSORB PROTOCOL FRAGMENT',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 5: Protocol Fragment — The sanctuary core resonates. Approach the altar to claim the fragment.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 5: PROTOCOL FRAGMENT',
@@ -1713,12 +1706,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE I OBJECTIVE',
             value: 'CROSS THE RUINED BRIDGE',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 1: The Divide Approach — The fortress approach is shattered. Cross collapsing spans and breach the perimeter.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 1: THE DIVIDE APPROACH',
             instruction: 'Crumbling volcanic spans shake and fall 0.75s after contact. Time your leaps and use Phase Dash [Shift] to cross wide chasms.',
@@ -1729,12 +1716,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE II OBJECTIVE',
             value: 'OVERRIDE SECURITY GATE [E]',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 2: The Crimson Citadel — Heavy security perimeter active. Hack the Citadel Security Console at x:2050 to lower blast barriers.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 2: THE CRIMSON CITADEL',
@@ -1747,12 +1728,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE III OBJECTIVE',
             value: 'STABILIZE REACTOR CORE [E]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 3: The Fracture Core — Violent dimensional rifts detected. Ride the magnetic ferry and stabilize the cooling console at x:3660.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 3: THE FRACTURE CORE',
             instruction: 'Phased crimson energy bridges cycle in and out on a timed rhythm. Cross with precise momentum or ride the core shuttle.',
@@ -1763,12 +1738,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE IV OBJECTIVE',
             value: 'PURGE VAULT HAZARDS [E]',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 4: The Entropy Vault — High-voltage laser containment online. Access the Vault Purge terminal at x:5000 to neutralize emitters.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 4: THE ENTROPY VAULT',
@@ -1781,12 +1750,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE V OBJECTIVE',
             value: 'REROUTE CORE CONDUIT [E]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 5: The Entropy Nexus — Core energy destabilizing. Scale the ascending lifts and reroute conduit power at x:6420.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 5: THE ENTROPY NEXUS',
             instruction: 'Ascend moving core elevators to reach the central dais. Rerouting the terminal activates the conduit bridge and opens the sanctum gates.',
@@ -1798,12 +1761,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE VI OBJECTIVE',
             value: 'NEUTRALIZE THE LAST WARDEN',
             alert: true,
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 6: The Last Warden — The ultimate fortress guardian awakens. Beware kinetic shields and arena-wide energy surges!',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 6: THE LAST WARDEN',
@@ -1821,12 +1778,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE I OBJECTIVE',
             value: 'DISCOVER ROOTLINE ANCHORS [F]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: "Stage 1: The Living Threshold — Biomechanical root structures react to G-ONE's presence. Use Rootline [F] to tether and vault to higher branches.",
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 1: THE LIVING THRESHOLD',
             instruction: 'Approach glowing bio-anchors and press [F] or Click to engage Rootline tether and vault across chasms.',
@@ -1837,12 +1788,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE II OBJECTIVE',
             value: 'NAVIGATE CANOPY CHASM',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 2: The Verdant Wilds — Acidic spore marshes cover the forest floor. Utilize Canopy Swing Tendrils and Spore Launch Bulbs to maintain high ground.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 2: THE VERDANT WILDS',
@@ -1855,12 +1800,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE III OBJECTIVE',
             value: 'ASCEND THE COLOSSUS INTERIOR',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 3: The Hollow Colossus — An immense hollow tree serving as an organic transmission tower. Ride the vertical bio-elevator and traverse core interior gantries.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 3: THE HOLLOW COLOSSUS',
             instruction: 'Board the moving bio-elevator to ascend vertical trunk sections. Beware Canopy Hunters diving from overhead perches.',
@@ -1871,12 +1810,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE IV OBJECTIVE',
             value: 'HARMONIZE HEARTROOT CONDUIT [E]',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 4: The Heartroot Sanctuary — Sacred cathedral of living technology. Access the Heartroot Blossom at x:4850 to restore the retracted light-bridge.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 4: THE HEARTROOT SANCTUARY',
@@ -1889,12 +1822,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE V OBJECTIVE',
             value: 'OVERCHARGE SEED CONTAINMENT [E]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 5: The Biosphere Crucible — The core containment chamber. Cross phasing bio-bridges, defeat the Crucible Vanguard, and override containment at x:6720.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 5: THE BIOSPHERE CRUCIBLE',
             instruction: 'Bio-light bridges cycle on timed frequencies. Override containment to unseal the Sanctuary Portal leading to the Arbiter.',
@@ -1906,12 +1833,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE VI OBJECTIVE',
             value: 'DEFEAT THE WORLDS EED GUARDIAN',
             alert: true,
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 6: The Worldseed Guardian — The ancient arbiter of the Verdant Abyss awakens. Grapple with Rootline to evade ground root sweeps!',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 6: THE WORLDSEED GUARDIAN',
@@ -1929,12 +1850,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE I OBJECTIVE',
             value: 'DISCOVER GRAVITAS ANCHORS [F]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 1: The Breach Beyond — Gravitational instability detected. Approach the Gravity Anchor and press [F] to invert the exit lift.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 1: THE BREACH BEYOND',
             instruction: 'Approach purple gravity anchors and press [F] or Click to engage Gravitas. Step into vertical updraft wells to float up to high shelves.',
@@ -1945,12 +1860,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE II OBJECTIVE',
             value: 'SCALE INVERTED MEGACITY',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 2: The Gravity Graveyard — The alien megacity hangs inverted. Scale the central tower using the anti-grav lift and sling anchor.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 2: THE GRAVITY GRAVEYARD',
@@ -1963,12 +1872,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE III OBJECTIVE',
             value: 'COLLAPSE VOID RIFTS [E / F]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 3: The Riftborn Hunt — Hostile dimensional predators emerge from void rifts. Destroy or disrupt the rift anchors to clear the sector.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 3: THE RIFTBORN HUNT',
             instruction: 'Rift Stalkers lunge aggressively. Target the glowing Dimensional Rift Anchors and press [E / F] to collapse the rifts and unseal the path.',
@@ -1979,12 +1882,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE IV OBJECTIVE',
             value: 'STABILIZE CRYSTAL NETWORK [E]',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 4: The Crystal Cataclysm — Tectonic crystal eruptions detected. Time your crossing between eruption cycles and reach the stabilizer console.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 4: THE CRYSTAL CATACLYSM',
@@ -1997,12 +1894,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE V OBJECTIVE',
             value: 'SURVIVE SINGULARITY PULL',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 5: The Devouring Singularity — The gravitational core is collapsing toward the abyss. Deploy Anti-Singularity Bubbles [F] to cross.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 5: THE DEVOURING SINGULARITY',
             instruction: 'Singularity vortex pulls G-ONE toward the abyss. Activate Anti-Singularity Anchors [F] to deploy stability bubbles that neutralize the gravitational pull.',
@@ -2014,12 +1905,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE VI OBJECTIVE',
             value: 'DEFEAT THE VOID SOVEREIGN',
             alert: true,
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 6: The Void Sovereign — The ancient guardian of the gravitational core awakens. Evade gravity fissure surges and disrupt the channeled core!',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 6: THE VOID SOVEREIGN',
@@ -2037,12 +1922,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE I OBJECTIVE',
             value: 'RECONFIGURE ENTRY BRIDGE [F]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 1: The Entry Protocol — Hostile reality overwrite detected. Reconfigure Protocol Node 1 [F] to assemble the shattered causeway.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 1: THE ENTRY PROTOCOL',
             instruction: 'Approach amber Protocol Nodes and press [F] or Click to reconfigure structures between baseline and overwritten states.',
@@ -2053,12 +1932,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE II OBJECTIVE',
             value: 'ASCEND RECURSIVE ENGINE',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 2: The Recursive Engine — Multi-tier industrial machinery in motion. Reconfigure the central assembly gantry to scale the vertical shafts.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 2: THE RECURSIVE ENGINE',
@@ -2071,12 +1944,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE III OBJECTIVE',
             value: 'RECONNECT DESYNC SPAN [F]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 3: The Desync Expanse — Geometric desynchronization across the sector. Activate the Desync Node to bridge the abyss.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 3: THE DESYNC EXPANSE',
             instruction: 'Traverse mismatched metallic slabs. Watch for roving Security Drones and neutralize Protocol Enforcers charging from guardposts.',
@@ -2087,12 +1954,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE IV OBJECTIVE',
             value: 'SURVIVE COMPRESSION PRESSES',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 4: The Null Foundry — Heavy industrial fabrication sector. Evade timed hydraulic compression presses and engage the conveyor assembly.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 4: THE NULL FOUNDRY',
@@ -2105,12 +1966,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE V OBJECTIVE',
             value: 'BREACH CITADEL BLAST GATE [F]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 5: The Firewall Citadel — Layered perimeter defenses and elite sentinels. Override the blast gate console at x:6140 to access the Overwrite Core.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 5: THE FIREWALL CITADEL',
             instruction: 'Defeat elite Firewall Sentinels guarding the bastion. Use elevated ivory vantage shelves to evade ground shockwave slams.',
@@ -2122,12 +1977,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE VI OBJECTIVE',
             value: 'DEFEAT THE PROTOCOL WARDEN',
             alert: true,
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 6: The Overwrite Core — The master control entity of the reality overwrite awakens. Beware shifting core geometry and hydraulic charges!',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 6: THE PROTOCOL WARDEN',
@@ -2145,12 +1994,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE I OBJECTIVE',
             value: 'LEARN PROTOCOL BREAK [F]',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: "Stage 1: The Crown's Shadow — The domain of the Black Crown. Trigger PROTOCOL BREAK [F] during enemy telegraphs to shatter their guard!",
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: "STAGE 1: THE CROWN'S SHADOW",
             instruction: 'When elite sentinels wind up heavy control attacks, a cyan reticle appears. Press [F] or Click to execute PROTOCOL BREAK and stun them!',
@@ -2161,12 +2004,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE II OBJECTIVE',
             value: 'BREACH HARROWED GATE',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 2: The Harrowed Gate — Fortified security perimeter. Scale the upper abyssal gantries to flank sniper marksmen or engage the garrison!',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 2: THE HARROWED GATE',
@@ -2179,12 +2016,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE III OBJECTIVE',
             value: 'SURVIVE PURSUIT STALKERS',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 3: The Hunting Grounds — Ambush zone. Highly agile Crown Stalkers execute lethal pursuit lunges. Maintain vertical advantage!',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 3: THE HUNTING GROUNDS',
             instruction: 'Crown Stalkers leap across chasms when aggressive. Use stepped tactical slabs and Overdrive bursts to clear pursuit squads.',
@@ -2195,12 +2026,6 @@ export class ArenaScene extends Phaser.Scene {
           EventBus.emit(GAME_EVENTS.CONTEXTUAL_STATUS_CHANGED, {
             label: 'STAGE IV OBJECTIVE',
             value: 'EVADE SANCTUM FISSURES',
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 4: The Broken Sanctum — The foundation fractures. Evade unstable corruption fissures and timing-cycled crushing barriers.',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 4: THE BROKEN SANCTUM',
@@ -2213,12 +2038,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE V OBJECTIVE',
             value: 'ASCEND THE RED WAKE',
           });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 5: The Red Wake — The final gauntlet approach. Ascend along jagged wake spires toward the monumental throne portal.',
-            speaker: 'SYSTEM',
-            duration: 5200,
-            priority: 2,
-          });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 5: THE RED WAKE',
             instruction: 'Elite Sentinels guard the citadel bridge. Execute Protocol Break [F] during their shockwave telegraph to open massive damage windows.',
@@ -2230,12 +2049,6 @@ export class ArenaScene extends Phaser.Scene {
             label: 'STAGE VI OBJECTIVE',
             value: 'DESTROY RA-ONE // THE FINAL PROTOCOL',
             alert: true,
-          });
-          EventBus.emit(GAME_EVENTS.SHOW_SUBTITLE, {
-            text: 'Stage 6: Ra-One: The Final Protocol — The dark master of the Black Crown awaits upon his throne. End the corruption forever!',
-            speaker: 'G-ONE',
-            duration: 5200,
-            priority: 2,
           });
           EventBus.emit(GAME_EVENTS.SHOW_TUTORIAL, {
             title: 'STAGE 6: THE FINAL PROTOCOL',
