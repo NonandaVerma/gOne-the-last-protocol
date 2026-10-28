@@ -7,7 +7,6 @@ import { ActiveRelicState } from '../../game/types/game';
 import { LevelState, LevelMetadata } from '../../game/systems/LevelState';
 import { SeamSigil } from '../ui/Seam';
 import { TutorialPanel } from './TutorialPanel';
-import { NarrationOverlay } from './NarrationOverlay';
 
 interface CooldownInfo {
   current: number;
@@ -397,9 +396,6 @@ export const GameHUD: React.FC = () => {
 
       {/* ================= UPPER-LEFT TUTORIAL PANEL ================= */}
       <TutorialPanel />
-
-      {/* ================= LOWER NARRATION & SUBTITLES ================= */}
-      <NarrationOverlay />
 
       {/* ================= ABILITY RAIL ================= */}
       <div className="w-full flex justify-center items-end gap-1.5 flex-wrap pb-1">

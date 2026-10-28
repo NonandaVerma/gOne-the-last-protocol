@@ -896,11 +896,19 @@ export const LEVELS: Record<number, LevelConfig> = {
 
         // Stage 3: The Hunting Grounds
         { kind: 'crown_stalker', x: 3100, y: GROUND_TOP - 60, patrolMin: 2950, patrolMax: 3250 },
-        { kind: 'crown_stalker', x: 3750, y: GROUND_TOP - 60, patrolMin: 3600, patrolMax: 3950 },
-        { kind: 'dominion_marksman', x: 3850, y: 450 },
+        // Moved off the mandatory 3450->3650 (tower)->3850 jump chokepoint: a hit
+        // landing mid-climb knocks the player back to the base of the step,
+        // and this pair used to patrol/snipe exactly there, able to repeatedly
+        // knock the player back down before they could clear it.
+        { kind: 'crown_stalker', x: 4000, y: GROUND_TOP - 60, patrolMin: 3950, patrolMax: 4180 },
+        { kind: 'dominion_marksman', x: 4050, y: 450 },
 
         // Stage 4: The Broken Sanctum
-        { kind: 'crown_sentinel', x: 4550, y: GROUND_TOP - 60, patrolMin: 4400, patrolMax: 4650 },
+        // Moved off the gap/step-up edge at x:4650 for the same reason as the
+        // Stage 3 pair above — a patrol sitting right on the jump-off point
+        // could knock the player back into the gap repeatedly before they
+        // could clear it. Now guards the landing side instead.
+        { kind: 'crown_sentinel', x: 4950, y: GROUND_TOP - 60, patrolMin: 4900, patrolMax: 5050 },
         { kind: 'crown_stalker', x: 5250, y: GROUND_TOP - 60, patrolMin: 5050, patrolMax: 5450 },
         { kind: 'dominion_marksman', x: 5400, y: 360 },
 

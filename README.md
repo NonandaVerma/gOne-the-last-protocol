@@ -256,7 +256,8 @@ Confirmed from `package.json` and source imports:
 - **lucide-react** — icon set used throughout the HUD/menus
 - **Web Audio API** (via `AudioManager.ts`) — procedural SFX/music synthesis, no external audio files
 - **@vercel/analytics** — page-view and custom gameplay-event tracking (added during this audit; see §17)
-- **ESLint** `^9.20.0`, **tsc --noEmit** — the project's only configured static-analysis tooling
+- **Vitest** `^5.0.5` — test runner for the pure-logic modules (added during this audit; see §18)
+- **ESLint** `^9.20.0`, **tsc --noEmit** — the remaining static-analysis tooling
 - **Vercel** — deployment target (inferred from project framing and `next build` output shape; no `vercel.json` is present, meaning deployment relies entirely on Vercel's Next.js zero-config detection)
 
 No backend, database, authentication, or server-side API route exists anywhere in `src/` — this is a fully client-side application.
@@ -357,9 +358,10 @@ npm run build
 
 # 7. Preview the production build
 npm run start
-```
 
-There is currently no automated test command in `package.json` (see §18).
+# 8. Run the automated test suite
+npm run test
+```
 
 ---
 
@@ -398,7 +400,9 @@ Every call is wrapped in a `typeof window` guard and a try/catch — analytics c
 
 ## 18. Testing and Quality Assurance
 
-**Automated tests**: none exist in the repository as of this audit, and no test runner is configured in `package.json`. `npm run type-check` (`tsc --noEmit`) and `npm run lint` (ESLint 9) are the only automated correctness gates currently in place, and both pass cleanly as of this document.
+**Automated tests**: `vitest` (added during this audit) covers the pure, Phaser-free systems — `EventBus`, `SaveManager`, `LevelState`, and the `LEVELS`/`RELIC_DEFINITIONS` data tables. 26 tests across 5 files, all passing. Run with `npm run test` (single run) or `npm run test:watch`. Several tests directly guard against regressions found and fixed during this audit — e.g. `SaveManager`'s "progress only ever increases" invariant (Phase 9) and `EventBus`'s "one throwing listener doesn't break the others" guarantee (which `ArenaScene` leans on heavily).
+
+Not yet covered: anything that imports Phaser (scenes, entities) or React (components) — both would need additional tooling (a Phaser-aware test harness / jsdom + React Testing Library respectively) beyond what's installed now. `npm run type-check` (`tsc --noEmit`) and `npm run lint` (ESLint 9) remain the other two automated gates, both passing.
 
 **Manual verification performed during this audit**: `npm run type-check`, `npm run lint`, and `npm run build` were run after every code change described in this document and confirmed clean. Gameplay behavior itself (the actual bug fixes — transition race condition, pitfall/shield exploit, missing touch control, broken tutorial text, broken victory background) was verified by reading the exact code paths involved, not by manual in-browser play-testing — this document does not claim hands-on QA across devices/browsers that wasn't actually performed.
 
@@ -465,7 +469,7 @@ Reasonable, not-yet-implemented ideas — not commitments:
 - Migrate the remaining `<img>` tags (`EndingScreen.tsx`, `LevelTransitionScreen.tsx`, `MainMenu.tsx`) to `next/image` for automatic responsive sizing (currently only flagged by ESLint, not acted on, since it's a larger structural change than a straight swap).
 - Resolve the Realm I fragment-collection ambiguity one way or the other — either gate the transition on it, or drop the "claim the fragment" prompt.
 - Produce (or confirm the absence of) reveal cinematics for Realms V and VI.
-- Add an automated test runner — currently there is none.
+- Extend automated test coverage to Phaser scenes/entities and React components, which need additional tooling (a Phaser-aware harness, jsdom + React Testing Library) beyond the Vitest setup added for pure-logic modules in this audit.
 
 ---
 
